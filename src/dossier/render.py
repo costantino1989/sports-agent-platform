@@ -90,17 +90,28 @@ class MatchMarkdownRenderer:
     def _render_players(self, data: MatchDossierData) -> str:
         """Render section 2 with players and descriptions."""
 
-        lines = ["## 2. Players on the field (best effort from available feeds)"]
+        lines = ["## 2. Players currently on the field"]
         has_players = False
+        missing_team_count = 0
         for team in data.teams:
-            lines.append(f"### {team.team_name} ({team.side})")
+            formation_suffix = f" | Formation: {team.formation}" if team.formation else ""
+            lines.append(f"### {team.team_name} ({team.side}){formation_suffix}")
             if not team.players:
+                missing_team_count += 1
                 lines.append(self._no_data(section_name=f"Players - {team.team_name}"))
                 continue
             has_players = True
-            for player in team.players:
-                lines.append(f"- **{player.name}** | Role: {player.role} | {player.description}")
-        if not has_players:
+            rows = [
+                [player.name, player.role, player.description, player.stats]
+                for player in team.players
+            ]
+            lines.append(
+                render_table(
+                    ["Player", "Role", "Description", "Season stats"],
+                    rows,
+                )
+            )
+        if not has_players and missing_team_count == 0:
             lines.append(self._no_data(section_name="Players on the field"))
         return "\n".join(lines)
 

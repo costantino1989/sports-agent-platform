@@ -29,6 +29,18 @@ class DossierDataClient:
 
         self._client = client
 
+    def fetch_by_url(self, url: str) -> JsonData:
+        """Fetch JSON payload from a fully-qualified URL.
+
+        Args:
+            url: Absolute ESPN endpoint URL.
+
+        Returns:
+            Endpoint JSON payload.
+        """
+
+        return self._client.fetch_json(url=url)
+
     def fetch_summary(self, league_slug: str, event_id: str) -> JsonData:
         """Fetch the match summary payload.
 

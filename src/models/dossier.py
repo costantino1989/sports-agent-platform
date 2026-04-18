@@ -48,11 +48,13 @@ class PlayerLine:
         name: Player display name.
         role: Player role or position.
         description: Human-readable player description.
+        stats: Human-readable season statistics summary.
     """
 
     name: str
     role: str
     description: str
+    stats: str
 
 
 @dataclass(slots=True, frozen=True)
@@ -63,6 +65,7 @@ class TeamDossierData:
         team_id: ESPN team identifier.
         team_name: Team display name.
         side: Home or away side.
+        formation: Team formation (e.g., 4-4-2) when available.
         roster: Team roster payload.
         injuries: Team injury report payload.
         schedule: Team schedule payload.
@@ -72,6 +75,7 @@ class TeamDossierData:
     team_id: str
     team_name: str
     side: str
+    formation: str | None
     roster: EndpointPayload
     injuries: EndpointPayload
     schedule: EndpointPayload

@@ -1,8 +1,9 @@
-"""Extraction helpers for dossier team/player and head-to-head sections."""
+"""Extraction helpers for team-level dossier datasets."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from src.dossier.client import DossierDataClient
 from src.dossier.head_to_head import (
@@ -10,6 +11,13 @@ from src.dossier.head_to_head import (
     extract_event_score,
     extract_event_status,
 )
+from src.dossier.lineup_players import (
+    extract_formation,
+    extract_on_field_roster_entries,
+    extract_summary_rosters_by_team,
+)
+from src.dossier.player_season_stats import build_player_season_stats
+from src.dossier.schedule_events import extract_competitor_ids, extract_schedule_events
 from src.espn import EspnApiError
 from src.models.dossier import EndpointPayload, JsonData, JsonDict, PlayerLine, TeamDossierData
 from src.models.live_models import MatchRecordModel
@@ -35,19 +43,22 @@ class DossierDataExtractor:
         self,
         match: MatchRecordModel,
         league_slug: str,
+        summary_payload: JsonData | None,
         safe_fetcher: Callable[[Callable[[], JsonData]], EndpointPayload],
     ) -> list[TeamDossierData]:
-        """Build team-level payloads and player lines for one match.
+        """Build team-level payloads and current on-field player lines.
 
         Args:
             match: Match record.
             league_slug: ESPN league slug.
+            summary_payload: Match summary payload used to detect current on-field players.
             safe_fetcher: Safe endpoint wrapper function from action.
 
         Returns:
             Team dossier entries for both competitors.
         """
 
+        summary_rosters = extract_summary_rosters_by_team(summary_payload=summary_payload)
         teams_data: list[TeamDossierData] = []
         for team in match.teams:
             team_id = team.team.id or ""
@@ -67,12 +78,21 @@ class DossierDataExtractor:
                     team_id,
                 )
             )
-            players = self._build_player_lines(league_slug=league_slug, roster=roster)
+            formation = None
+            players: list[PlayerLine] = []
+            summary_roster = summary_rosters.get(team_id)
+            if isinstance(summary_roster, dict):
+                formation = extract_formation(summary_roster=summary_roster)
+                players = self._build_on_field_player_lines(
+                    league_slug=league_slug,
+                    roster_entries=summary_roster.get("roster"),
+                )
             teams_data.append(
                 TeamDossierData(
                     team_id=team_id,
                     team_name=team_name,
                     side=team.side or "unknown",
+                    formation=formation,
                     roster=roster,
                     injuries=injuries,
                     schedule=schedule,
@@ -95,10 +115,10 @@ class DossierDataExtractor:
             return []
         home_id = teams[0].team_id
         away_id = teams[1].team_id
-        events = self._extract_schedule_events(teams[0].schedule.data)
+        events = extract_schedule_events(teams[0].schedule.data)
         head_to_head: list[JsonDict] = []
         for event in events:
-            competitor_ids = self._extract_competitor_ids(event)
+            competitor_ids = extract_competitor_ids(event)
             if home_id in competitor_ids and away_id in competitor_ids:
                 head_to_head.append(
                     {
@@ -111,27 +131,44 @@ class DossierDataExtractor:
                 )
         return head_to_head[:10]
 
-    def _build_player_lines(self, league_slug: str, roster: EndpointPayload) -> list[PlayerLine]:
-        """Extract and enrich player lines from roster payload.
+    def _build_on_field_player_lines(
+        self, league_slug: str, roster_entries: Any
+    ) -> list[PlayerLine]:
+        """Build player lines for athletes currently on the field.
 
         Args:
             league_slug: ESPN league slug.
-            roster: Team roster endpoint payload.
+            roster_entries: Summary roster entries for one team.
 
         Returns:
-            Up to eleven player lines suitable for the markdown section.
+            Player lines for players currently on field.
         """
 
-        athletes = self._extract_athletes(node=roster.data)
-        selected = athletes[:11]
+        on_field_entries = extract_on_field_roster_entries(roster_entries=roster_entries)
         player_lines: list[PlayerLine] = []
-        for player in selected:
-            name = str(player.get("displayName") or player.get("fullName") or "Unknown player")
-            role = self._extract_role(player)
-            athlete_id = str(player.get("id") or "")
+        for entry in on_field_entries:
+            athlete = entry.get("athlete", {})
+            if not isinstance(athlete, dict):
+                continue
+            name = str(
+                athlete.get("displayName")
+                or athlete.get("fullName")
+                or athlete.get("shortName")
+                or "Unknown player"
+            )
+            role = self._extract_role(entry)
+            athlete_id = str(athlete.get("id") or "")
             athlete_payload = self._fetch_athlete(league_slug=league_slug, athlete_id=athlete_id)
-            description = self._build_player_description(player=player, athlete_payload=athlete_payload)
-            player_lines.append(PlayerLine(name=name, role=role, description=description))
+            description = self._build_player_description(player=entry, athlete_payload=athlete_payload)
+            stats = self._build_player_season_stats(athlete_payload=athlete_payload, role=role)
+            player_lines.append(
+                PlayerLine(
+                    name=name,
+                    role=role,
+                    description=description,
+                    stats=stats,
+                )
+            )
         return player_lines
 
     def _fetch_athlete(self, league_slug: str, athlete_id: str) -> EndpointPayload:
@@ -143,39 +180,12 @@ class DossierDataExtractor:
             payload = self._data_client.fetch_athlete(league_slug, athlete_id)
         except EspnApiError as exc:
             return EndpointPayload(data=None, error=str(exc))
+        payload = self._resolve_athlete_statistics_reference(athlete_payload=payload)
         if isinstance(payload, dict) and not payload:
             return EndpointPayload(data=None)
         if isinstance(payload, list) and not payload:
             return EndpointPayload(data=None)
         return EndpointPayload(data=payload)
-
-    def _extract_athletes(self, node: JsonData | None) -> list[JsonDict]:
-        """Recursively extract athlete-like entries from a roster payload."""
-
-        if node is None:
-            return []
-        collected: list[JsonDict] = []
-        self._collect_athletes(node=node, collected=collected)
-        unique: dict[str, JsonDict] = {}
-        for athlete in collected:
-            athlete_id = str(athlete.get("id") or "")
-            if not athlete_id or athlete_id in unique:
-                continue
-            unique[athlete_id] = athlete
-        return list(unique.values())
-
-    def _collect_athletes(self, node: JsonData | JsonDict, collected: list[JsonDict]) -> None:
-        """Walk nested JSON and collect athlete-like dictionaries."""
-
-        if isinstance(node, dict):
-            if "id" in node and ("displayName" in node or "fullName" in node):
-                collected.append(node)
-            for value in node.values():
-                self._collect_athletes(value, collected)
-            return
-        if isinstance(node, list):
-            for item in node:
-                self._collect_athletes(item, collected)
 
     def _extract_role(self, player: JsonDict) -> str:
         """Extract a role string for a player dictionary."""
@@ -204,43 +214,27 @@ class DossierDataExtractor:
             parts.append("Enrichment unavailable from athlete endpoint")
         return ". ".join(parts) if parts else "No additional athlete details found"
 
-    def _extract_schedule_events(self, payload: JsonData | None) -> list[JsonDict]:
-        """Extract schedule event entries from arbitrary nested payload."""
+    def _resolve_athlete_statistics_reference(self, athlete_payload: JsonData) -> JsonData:
+        """Resolve athlete statistics reference into an inline payload when available."""
 
-        events: list[JsonDict] = []
-        if isinstance(payload, dict):
-            direct_events = payload.get("events")
-            if isinstance(direct_events, list):
-                return [item for item in direct_events if isinstance(item, dict)]
-        self._collect_event_nodes(node=payload, collected=events)
-        return events
+        if not isinstance(athlete_payload, dict):
+            return athlete_payload
+        statistics = athlete_payload.get("statistics")
+        if not isinstance(statistics, dict):
+            return athlete_payload
+        reference_url = statistics.get("$ref")
+        if not isinstance(reference_url, str) or not reference_url.strip():
+            return athlete_payload
+        try:
+            statistics_payload = self._data_client.fetch_by_url(reference_url)
+        except EspnApiError:
+            return athlete_payload
+        enriched_payload = dict(athlete_payload)
+        enriched_payload["statistics"] = statistics_payload
+        return enriched_payload
 
-    def _collect_event_nodes(self, node: JsonData | None, collected: list[JsonDict]) -> None:
-        """Recursively collect event-like dictionaries from nested payload."""
+    def _build_player_season_stats(self, athlete_payload: EndpointPayload, role: str) -> str:
+        """Build concise season stats for one player line."""
 
-        if isinstance(node, dict):
-            if "competitions" in node and "date" in node:
-                collected.append(node)
-            for value in node.values():
-                self._collect_event_nodes(value, collected)
-            return
-        if isinstance(node, list):
-            for item in node:
-                self._collect_event_nodes(item, collected)
-
-    def _extract_competitor_ids(self, event: JsonDict) -> set[str]:
-        """Extract competitor IDs from an event dictionary."""
-
-        competitor_ids: set[str] = set()
-        competitions = event.get("competitions")
-        if not isinstance(competitions, list):
-            return competitor_ids
-        for competition in competitions:
-            competitors = competition.get("competitors", []) if isinstance(competition, dict) else []
-            for competitor in competitors:
-                team = competitor.get("team", {}) if isinstance(competitor, dict) else {}
-                team_id = team.get("id")
-                if team_id is not None:
-                    competitor_ids.add(str(team_id))
-        return competitor_ids
-
+        details = athlete_payload.data if isinstance(athlete_payload.data, dict) else None
+        return build_player_season_stats(athlete_data=details, role=role)

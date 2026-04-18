@@ -136,6 +136,7 @@ class MatchDossierAction:
         teams = self._extractor.build_teams_data(
             match=match,
             league_slug=league_slug,
+            summary_payload=summary.data,
             safe_fetcher=self._safe_fetch,
         )
         head_to_head = self._extractor.build_head_to_head(teams=teams)
