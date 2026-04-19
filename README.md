@@ -112,7 +112,7 @@ Directory: `output\match_markdowns`
 
 Naming file: `<league_slug>_<event_id>.md` (esempio: `eng_3_745657.md`).
 
-Il dossier mantiene 16 sezioni; dalla sezione 4 in poi è reso in modo più conversazionale/tabellare (non dump JSON grezzo) con sanificazione dei campi tecnici non utili (`href`, `$ref`, `uid`, `id`, campi vuoti).
+Il dossier mantiene 14 sezioni; dalla sezione 4 in poi è reso in modo più conversazionale/tabellare (non dump JSON grezzo) con sanificazione dei campi tecnici non utili (`href`, `$ref`, `uid`, `id`, campi vuoti).
 
 ## Log
 

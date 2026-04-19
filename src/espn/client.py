@@ -58,6 +58,10 @@ class EspnSoccerClient:
             raise EspnApiError(
                 f"HTTP error while reading ESPN resource '{url}': {exc.code}"
             ) from exc
+        except TimeoutError as exc:
+            raise EspnApiError(
+                f"Timeout while reading ESPN resource '{url}'."
+            ) from exc
         except URLError as exc:
             raise EspnApiError(
                 f"Network error while reading ESPN resource '{url}': {exc.reason}"

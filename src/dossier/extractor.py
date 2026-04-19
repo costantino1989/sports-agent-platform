@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 from src.dossier.client import DossierDataClient
@@ -18,7 +19,6 @@ from src.dossier.lineup_players import (
 )
 from src.dossier.player_season_stats import build_player_season_stats
 from src.dossier.schedule_events import extract_competitor_ids, extract_schedule_events
-from src.espn import EspnApiError
 from src.models.dossier import EndpointPayload, JsonData, JsonDict, PlayerLine, TeamDossierData
 from src.models.live_models import MatchRecordModel
 
@@ -64,19 +64,13 @@ class DossierDataExtractor:
             team_id = team.team.id or ""
             team_name = team.team.display_name or team.team.name or team.side or "Unknown team"
             roster = safe_fetcher(
-                lambda team_id=team_id: self._data_client.fetch_team_roster(league_slug, team_id)
+                partial(self._data_client.fetch_team_roster, league_slug, team_id)
             )
             injuries = safe_fetcher(
-                lambda team_id=team_id: self._data_client.fetch_team_injuries(
-                    league_slug,
-                    team_id,
-                )
+                partial(self._data_client.fetch_team_injuries, league_slug, team_id)
             )
             schedule = safe_fetcher(
-                lambda team_id=team_id: self._data_client.fetch_team_schedule(
-                    league_slug,
-                    team_id,
-                )
+                partial(self._data_client.fetch_team_schedule, league_slug, team_id)
             )
             formation = None
             players: list[PlayerLine] = []
@@ -86,6 +80,7 @@ class DossierDataExtractor:
                 players = self._build_on_field_player_lines(
                     league_slug=league_slug,
                     roster_entries=summary_roster.get("roster"),
+                    safe_fetcher=safe_fetcher,
                 )
             teams_data.append(
                 TeamDossierData(
@@ -132,13 +127,17 @@ class DossierDataExtractor:
         return head_to_head[:10]
 
     def _build_on_field_player_lines(
-        self, league_slug: str, roster_entries: Any
+        self,
+        league_slug: str,
+        roster_entries: Any,
+        safe_fetcher: Callable[[Callable[[], JsonData]], EndpointPayload],
     ) -> list[PlayerLine]:
         """Build player lines for athletes currently on the field.
 
         Args:
             league_slug: ESPN league slug.
             roster_entries: Summary roster entries for one team.
+            safe_fetcher: Safe endpoint wrapper function with shared fetch limiter.
 
         Returns:
             Player lines for players currently on field.
@@ -158,7 +157,11 @@ class DossierDataExtractor:
             )
             role = self._extract_role(entry)
             athlete_id = str(athlete.get("id") or "")
-            athlete_payload = self._fetch_athlete(league_slug=league_slug, athlete_id=athlete_id)
+            athlete_payload = self._fetch_athlete(
+                league_slug=league_slug,
+                athlete_id=athlete_id,
+                safe_fetcher=safe_fetcher,
+            )
             description = self._build_player_description(player=entry, athlete_payload=athlete_payload)
             stats = self._build_player_season_stats(athlete_payload=athlete_payload, role=role)
             player_lines.append(
@@ -171,21 +174,23 @@ class DossierDataExtractor:
             )
         return player_lines
 
-    def _fetch_athlete(self, league_slug: str, athlete_id: str) -> EndpointPayload:
+    def _fetch_athlete(
+        self,
+        league_slug: str,
+        athlete_id: str,
+        safe_fetcher: Callable[[Callable[[], JsonData]], EndpointPayload],
+    ) -> EndpointPayload:
         """Fetch one athlete profile with endpoint-level safety."""
 
         if not athlete_id:
             return EndpointPayload(data=None)
-        try:
-            payload = self._data_client.fetch_athlete(league_slug, athlete_id)
-        except EspnApiError as exc:
-            return EndpointPayload(data=None, error=str(exc))
-        payload = self._resolve_athlete_statistics_reference(athlete_payload=payload)
-        if isinstance(payload, dict) and not payload:
-            return EndpointPayload(data=None)
-        if isinstance(payload, list) and not payload:
-            return EndpointPayload(data=None)
-        return EndpointPayload(data=payload)
+        athlete_payload = safe_fetcher(
+            partial(self._data_client.fetch_athlete, league_slug, athlete_id)
+        )
+        return self._resolve_athlete_statistics_reference(
+            athlete_payload=athlete_payload,
+            safe_fetcher=safe_fetcher,
+        )
 
     def _extract_role(self, player: JsonDict) -> str:
         """Extract a role string for a player dictionary."""
@@ -214,24 +219,27 @@ class DossierDataExtractor:
             parts.append("Enrichment unavailable from athlete endpoint")
         return ". ".join(parts) if parts else "No additional athlete details found"
 
-    def _resolve_athlete_statistics_reference(self, athlete_payload: JsonData) -> JsonData:
+    def _resolve_athlete_statistics_reference(
+        self,
+        athlete_payload: EndpointPayload,
+        safe_fetcher: Callable[[Callable[[], JsonData]], EndpointPayload],
+    ) -> EndpointPayload:
         """Resolve athlete statistics reference into an inline payload when available."""
 
-        if not isinstance(athlete_payload, dict):
+        if not isinstance(athlete_payload.data, dict):
             return athlete_payload
-        statistics = athlete_payload.get("statistics")
+        statistics = athlete_payload.data.get("statistics")
         if not isinstance(statistics, dict):
             return athlete_payload
         reference_url = statistics.get("$ref")
         if not isinstance(reference_url, str) or not reference_url.strip():
             return athlete_payload
-        try:
-            statistics_payload = self._data_client.fetch_by_url(reference_url)
-        except EspnApiError:
+        statistics_payload = safe_fetcher(partial(self._data_client.fetch_by_url, reference_url))
+        if not statistics_payload.has_data():
             return athlete_payload
-        enriched_payload = dict(athlete_payload)
-        enriched_payload["statistics"] = statistics_payload
-        return enriched_payload
+        enriched_payload = dict(athlete_payload.data)
+        enriched_payload["statistics"] = statistics_payload.data
+        return EndpointPayload(data=enriched_payload, error=athlete_payload.error)
 
     def _build_player_season_stats(self, athlete_payload: EndpointPayload, role: str) -> str:
         """Build concise season stats for one player line."""

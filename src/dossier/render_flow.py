@@ -91,7 +91,7 @@ class MatchFlowRenderer:
         )
 
     def render_news(self, data: MatchDossierData, section_index: int) -> str:
-        """Render section 7 or 15 with full available news content."""
+        """Render section 7 or 13 with full available news content."""
 
         title = "News and transfer updates" if section_index == 7 else "Latest match and transfer updates"
         rows = self._extractor.extract_news_rows(payload=data.news.data)
@@ -156,28 +156,42 @@ class MatchFlowRenderer:
             blocks.append("No spread/totals lines were returned by ESPN.")
         return "\n".join(blocks)
 
-    def render_commentary(self, data: MatchDossierData) -> str:
-        """Render section 9 with conversational commentary bullets."""
-
-        play_rows = self.extract_play_rows(data=data, limit=6)
-        if not play_rows:
-            return f"## 9. Commentary\n{self._no_data('Commentary')}"
-        bullets = [f"- {row[0]} | {row[1]} | {row[2]} ({row[3]})" for row in play_rows]
-        return "## 9. Commentary\nLatest noteworthy commentary lines:\n" + "\n".join(bullets)
-
     def render_match_details(self, data: MatchDossierData) -> str:
-        """Render section 10 with meaningful match context."""
+        """Render section 9 with meaningful match context."""
 
         competition = sanitize_payload(data.core_competition.data)
         event = sanitize_payload(data.core_event.data)
         if competition is None and event is None:
-            return f"## 10. Single match details\n{self._no_data('Single match details')}"
+            return f"## 9. Single match details\n{self._no_data('Single match details')}"
         neutral_site = self._extractor.extract_first_bool(payload=competition, key="neutralSite")
-        venue_context = "Neutral venue (no home-field advantage)." if neutral_site is True else "Standard home-away venue." if neutral_site is False else "Venue context unavailable."
+        venue_context = (
+            "Neutral venue (no home-field advantage)."
+            if neutral_site is True
+            else "Standard home-away venue."
+            if neutral_site is False
+            else "Venue context unavailable."
+        )
         venue = self._extractor.extract_first_text(payload=competition, key="fullName")
         attendance = self._extractor.extract_first_text(payload=competition, key="attendance")
-        rows = [["Kickoff (UTC)", as_text(data.match.event.date)], ["Current status", self.extract_status_detail(data=data)], ["Venue", as_text(venue)], ["Venue context", venue_context], ["Attendance", as_text(attendance)]]
-        return "## 10. Single match details\nContextual details that can influence game dynamics.\n\n" + render_table(["Detail", "Value"], rows)
+        venue_city, venue_country = self._extract_venue_address(competition=competition)
+        competition_group = self._extract_competition_group(competition=competition)
+        match_officials = self._extract_match_officials(competition=competition)
+        rows = [
+            ["Kickoff (UTC)", as_text(data.match.event.date)],
+            ["Current status", self.extract_status_detail(data=data)],
+            ["Venue", as_text(venue)],
+            ["Venue city", venue_city],
+            ["Venue country", venue_country],
+            ["Competition group", competition_group],
+            ["Match officials", match_officials],
+            ["Venue context", venue_context],
+            ["Attendance", as_text(attendance)],
+        ]
+        return (
+            "## 9. Single match details\n"
+            "Contextual details that can influence game dynamics.\n\n"
+            + render_table(["Detail", "Value"], rows)
+        )
 
     def extract_play_rows(
         self,
@@ -192,6 +206,69 @@ class MatchFlowRenderer:
         """Return current match status detail from event payload."""
 
         return self._extractor.extract_status_detail(data=data)
+
+    def _extract_venue_address(self, competition: JsonDict | list[Any] | None) -> tuple[str, str]:
+        """Extract venue city and country from competition payload.
+
+        Args:
+            competition: Core competition payload.
+
+        Returns:
+            Venue city and country values.
+        """
+
+        venue_candidates = find_dicts_with_keys(
+            payload=competition,
+            required_keys={"fullName", "address"},
+            limit=1,
+        )
+        if not venue_candidates:
+            return as_text(None), as_text(None)
+        address = venue_candidates[0].get("address")
+        if not isinstance(address, dict):
+            return as_text(None), as_text(None)
+        return as_text(address.get("city")), as_text(address.get("country"))
+
+    def _extract_competition_group(self, competition: JsonDict | list[Any] | None) -> str:
+        """Extract competition group name or abbreviation.
+
+        Args:
+            competition: Core competition payload.
+
+        Returns:
+            Competition group text.
+        """
+
+        if isinstance(competition, dict):
+            resolved = competition.get("groupResolved")
+            if isinstance(resolved, str) and resolved.strip():
+                return resolved.strip()
+            groups = competition.get("groups")
+            if isinstance(groups, dict):
+                candidate = groups.get("name") or groups.get("abbreviation")
+                if isinstance(candidate, str) and candidate.strip():
+                    return candidate.strip()
+        return as_text(None)
+
+    def _extract_match_officials(self, competition: JsonDict | list[Any] | None) -> str:
+        """Extract resolved match officials list from competition payload.
+
+        Args:
+            competition: Core competition payload.
+
+        Returns:
+            Comma-separated official names.
+        """
+
+        if not isinstance(competition, dict):
+            return as_text(None)
+        officials = competition.get("officialsResolved")
+        if not isinstance(officials, list):
+            return as_text(None)
+        names = [name.strip() for name in officials if isinstance(name, str) and name.strip()]
+        if not names:
+            return as_text(None)
+        return ", ".join(names)
 
     def _build_full_stats_table(
         self,

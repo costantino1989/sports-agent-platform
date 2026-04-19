@@ -1,10 +1,9 @@
-"""Render dossier sections for probabilities, standings, and summary context."""
+"""Render dossier sections for league standings, leaders, and rankings."""
 
 from __future__ import annotations
 
 from typing import Any, TypeAlias
 
-from src.dossier.render_flow import MatchFlowRenderer
 from src.dossier.render_tools import (
     as_text,
     build_stat_map,
@@ -24,44 +23,17 @@ NO_DATA_TEMPLATE = (
 
 
 class MatchContextRenderer:
-    """Render sections that provide league context and closing summary."""
+    """Render sections that provide league context."""
 
-    def __init__(self, flow_renderer: MatchFlowRenderer) -> None:
-        """Initialize context renderer dependencies.
-
-        Args:
-            flow_renderer: Live-flow renderer reused for shared signals.
-        """
-
-        self._flow_renderer = flow_renderer
-
-    def render_probabilities(self, data: MatchDossierData) -> str:
-        """Render section 11 with interpreted win probabilities."""
-
-        payload = sanitize_payload(data.probabilities.data)
-        if payload is None:
-            return f"## 11. Real-time win probability\n{self._no_data('Real-time win probability')}"
-        candidates = find_dicts_with_keys(payload, {"homeWinPercentage", "awayWinPercentage"}, limit=3)
-        if not candidates:
-            return f"## 11. Real-time win probability\n{self._no_data('Real-time win probability')}"
-        point = candidates[0]
-        rows = [
-            ["Home win", self._format_probability(point.get("homeWinPercentage"))],
-            ["Draw", self._format_probability(point.get("drawPercentage"))],
-            ["Away win", self._format_probability(point.get("awayWinPercentage"))],
-        ]
-        return (
-            "## 11. Real-time win probability\n"
-            "Live model probabilities currently available.\n\n"
-            + render_table(["Outcome", "Probability"], rows)
-        )
+    def __init__(self) -> None:
+        """Initialize context renderer."""
 
     def render_standings(self, data: MatchDossierData) -> str:
-        """Render section 12 with trimmed league standings table."""
+        """Render section 10 with trimmed league standings table."""
 
         payload = sanitize_payload(data.standings.data)
         if payload is None:
-            return f"## 12. League standings\n{self._no_data('League standings')}"
+            return f"## 10. League standings\n{self._no_data('League standings')}"
         entries = find_dicts_with_keys(payload, {"team", "stats"}, limit=40)
         rows: list[list[str]] = []
         seen_teams: set[str] = set()
@@ -84,20 +56,20 @@ class MatchContextRenderer:
             if len(rows) >= 12:
                 break
         if not rows:
-            return f"## 12. League standings\n{self._no_data('League standings')}"
+            return f"## 10. League standings\n{self._no_data('League standings')}"
         legend = "Legend: P = matches played, Pts = points, GD = goal difference, Form = wins-draws-losses."
         return (
-            "## 12. League standings\n"
+            "## 10. League standings\n"
             f"{legend}\n\n"
             + render_table(["Team", "P", "Pts", "GD", "Form"], rows)
         )
 
     def render_leaders(self, data: MatchDossierData) -> str:
-        """Render section 13 with season leaders table."""
+        """Render section 11 with season leaders table."""
 
         payload = sanitize_payload(data.leaders.data)
         if payload is None:
-            return f"## 13. Top scorers and season leaders\n{self._no_data('Top scorers and season leaders')}"
+            return f"## 11. Top scorers and season leaders\n{self._no_data('Top scorers and season leaders')}"
         categories = find_dicts_with_keys(payload, {"leaders"}, limit=30)
         rows: list[list[str]] = []
         for category in categories:
@@ -118,15 +90,15 @@ class MatchContextRenderer:
             if len(rows) >= 10:
                 break
         if not rows:
-            return f"## 13. Top scorers and season leaders\n{self._no_data('Top scorers and season leaders')}"
-        return "## 13. Top scorers and season leaders\n\n" + render_table(["Category", "Leader", "Value", "Team"], rows)
+            return f"## 11. Top scorers and season leaders\n{self._no_data('Top scorers and season leaders')}"
+        return "## 11. Top scorers and season leaders\n\n" + render_table(["Category", "Leader", "Value", "Team"], rows)
 
     def render_rankings(self, data: MatchDossierData) -> str:
-        """Render section 14 with ranking table when available."""
+        """Render section 12 with ranking table when available."""
 
         payload = sanitize_payload(data.rankings.data)
         if payload is None:
-            return f"## 14. Rankings\n{self._no_data('Rankings')}"
+            return f"## 12. Rankings\n{self._no_data('Rankings')}"
         entries = find_dicts_with_keys(payload, {"rank"}, limit=40)
         rows: list[list[str]] = []
         for entry in entries:
@@ -139,46 +111,8 @@ class MatchContextRenderer:
             if len(rows) >= 12:
                 break
         if not rows:
-            return f"## 14. Rankings\n{self._no_data('Rankings')}"
-        return "## 14. Rankings\n\n" + render_table(["Rank", "Team", "Rating", "Trend"], rows)
-
-    def render_summary(self, data: MatchDossierData) -> str:
-        """Render section 16 with a final decision-oriented narrative."""
-
-        scoreline = self._extract_scoreline(data=data)
-        status_detail = self._flow_renderer.extract_status_detail(data=data)
-        play_rows = self._flow_renderer.extract_play_rows(data=data, limit=5)
-        high_impact = [row for row in play_rows if row[3] != "General play update"]
-        lines = [
-            "## 16. Full match summary",
-            f"- Current state: {scoreline}.",
-            f"- Live context: {status_detail}.",
-        ]
-        if high_impact:
-            lines.append("- Recent decisive signals:")
-            lines.extend([f"  - {row[0]} | {row[2]} ({row[3]})" for row in high_impact[:3]])
-        else:
-            lines.append("- No major high-impact events were flagged in recent plays.")
-        return "\n".join(lines)
-
-    def _extract_scoreline(self, data: MatchDossierData) -> str:
-        """Build scoreline sentence from match teams."""
-
-        parts = []
-        for team in data.match.teams:
-            name = team.team.display_name or team.team.name or team.side or "Team"
-            parts.append(f"{name} {as_text(team.score)}")
-        return " vs ".join(parts) if parts else "Scoreline unavailable"
-
-    def _format_probability(self, value: Any) -> str:
-        """Format probability values into percentage text."""
-
-        if value is None:
-            return "N/A"
-        if isinstance(value, (int, float)):
-            normalized = value * 100 if value <= 1 else value
-            return f"{normalized:.1f}%"
-        return as_text(value)
+            return f"## 12. Rankings\n{self._no_data('Rankings')}"
+        return "## 12. Rankings\n\n" + render_table(["Rank", "Team", "Rating", "Trend"], rows)
 
     def _no_data(self, section_name: str) -> str:
         """Build standardized no-data fallback text."""
