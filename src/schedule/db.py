@@ -63,7 +63,60 @@ class ScheduleDatabase:
         return connection
 
     def ensure_schema(self) -> None:
-        """Create scheduler tables when missing."""
+        """Create scheduler tables when missing and migrate legacy schema.
+
+        If an existing database still contains the legacy `status_state` column
+        on the `matches` table, perform an in-place migration to create the
+        new table without the column and copy existing rows across.
+        """
 
         with self.connect() as connection:
             connection.executescript(SCHEMA_SQL)
+
+            # Detect legacy column and migrate if present
+            try:
+                cursor = connection.execute("PRAGMA table_info(matches);")
+                columns = [row["name"] for row in cursor.fetchall()]
+            except sqlite3.DatabaseError:
+                # `matches` table does not exist yet; nothing to migrate
+                return
+
+            if "status_state" in columns:
+                connection.execute("PRAGMA foreign_keys=OFF;")
+                try:
+                    connection.execute("BEGIN;")
+                    connection.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS matches_new (
+                            event_id TEXT PRIMARY KEY,
+                            league_slug TEXT NOT NULL,
+                            league_name TEXT NOT NULL,
+                            competition_id TEXT NOT NULL,
+                            kickoff_utc TEXT NOT NULL,
+                            home_team TEXT NOT NULL,
+                            away_team TEXT NOT NULL,
+                            payload_json TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        );
+                        """
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO matches_new (
+                            event_id, league_slug, league_name, competition_id,
+                            kickoff_utc, home_team, away_team, payload_json, updated_at
+                        )
+                        SELECT
+                            event_id, league_slug, league_name, competition_id,
+                            kickoff_utc, home_team, away_team, payload_json, updated_at
+                        FROM matches;
+                        """
+                    )
+                    connection.execute("DROP TABLE matches;")
+                    connection.execute("ALTER TABLE matches_new RENAME TO matches;")
+                    connection.execute("COMMIT;")
+                except Exception:
+                    connection.execute("ROLLBACK;")
+                    raise
+                finally:
+                    connection.execute("PRAGMA foreign_keys=ON;")
