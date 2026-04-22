@@ -114,7 +114,6 @@ def build_schedule_dispatcher(
     weekly_action = build_weekly_action(client=client)
     dossier_action = build_dossier_action(client=client)
     schedule_db = ScheduleDatabase(db_path=db_path)
-    schedule_db.ensure_schema()
     connection = schedule_db.connect()
     match_repository = MatchRepository(connection=connection)
     run_repository = RunRepository(connection=connection)

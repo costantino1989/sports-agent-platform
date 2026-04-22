@@ -6,7 +6,7 @@ import sqlite3
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from src.models.schedule import MatchScheduleRecord, MatchSnapshotRecord
+from src.models.schedule import MatchScheduleRecord
 
 
 class MatchRepository:
@@ -105,75 +105,6 @@ class MatchRepository:
             updated_at=self._parse_iso_datetime(row["updated_at"]),
         )
 
-    def add_snapshot(self, snapshot: MatchSnapshotRecord) -> None:
-        """Insert one append-only match snapshot row.
-
-        Args:
-            snapshot: Snapshot row to append.
-        """
-
-        self._connection.execute(
-            """
-            INSERT INTO match_snapshots (
-                event_id, captured_at, status_state, minute, home_score, away_score,
-                source, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                snapshot.event_id,
-                snapshot.captured_at.isoformat(),
-                snapshot.status_state,
-                snapshot.minute,
-                snapshot.home_score,
-                snapshot.away_score,
-                snapshot.source,
-                snapshot.payload_json,
-            ),
-        )
-
-    def add_odds_snapshot(
-        self,
-        event_id: str,
-        captured_at: datetime,
-        provider: str,
-        snapshot_type: str,
-        home_odds: float | None,
-        draw_odds: float | None,
-        away_odds: float | None,
-        payload_json: str,
-    ) -> None:
-        """Insert one append-only odds snapshot row.
-
-        Args:
-            event_id: ESPN event identifier.
-            captured_at: Snapshot capture timestamp.
-            provider: Odds provider label.
-            snapshot_type: Odds snapshot type (Current/Open/Close).
-            home_odds: Decimal home odds.
-            draw_odds: Decimal draw odds.
-            away_odds: Decimal away odds.
-            payload_json: Serialized raw row payload.
-        """
-
-        self._connection.execute(
-            """
-            INSERT INTO odds_snapshots (
-                event_id, captured_at, provider, snapshot_type,
-                home_odds, draw_odds, away_odds, payload_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                event_id,
-                captured_at.isoformat(),
-                provider,
-                snapshot_type,
-                home_odds,
-                draw_odds,
-                away_odds,
-                payload_json,
-            ),
-        )
-
     @staticmethod
     def _parse_iso_datetime(raw_value: str) -> datetime:
         """Parse ISO datetime from DB text column.
@@ -189,4 +120,3 @@ class MatchRepository:
         if parsed.tzinfo is None:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc)
-

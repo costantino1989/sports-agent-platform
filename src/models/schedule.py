@@ -86,7 +86,6 @@ class MatchSnapshotRecord(ScheduleBaseModel):
 
     event_id: str = Field(description="ESPN event identifier.")
     captured_at: datetime = Field(description="Snapshot capture timestamp in UTC.")
-    status_state: str = Field(description="Match state at capture time.")
     minute: int | None = Field(default=None, ge=0, description="Detected match minute.")
     home_score: str | None = Field(default=None, description="Home score value.")
     away_score: str | None = Field(default=None, description="Away score value.")
@@ -124,4 +123,3 @@ class ScheduleTickResult(ScheduleBaseModel):
         ge=0,
         description="Number of runs skipped due to missing prerequisites.",
     )
-

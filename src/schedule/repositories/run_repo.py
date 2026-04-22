@@ -70,8 +70,7 @@ class RunRepository:
             now_param = now_utc.isoformat()
         row = self._connection.execute(
             """
-            SELECT id, event_id, run_type, scheduled_for_utc, status, attempt_count,
-                   claimed_at, finished_at, error
+            SELECT id, event_id, run_type, scheduled_for_utc, status, finished_in, error
             FROM scheduled_runs
             WHERE status = 'pending' AND scheduled_for_utc <= ?
             ORDER BY scheduled_for_utc ASC, id ASC
@@ -177,33 +176,6 @@ class RunRepository:
             WHERE id = ?
             """,
             (finished_at.isoformat(), reason[:2000], run_id),
-        )
-
-    def add_attempt(
-            self,
-            run_id: int,
-            started_at: datetime,
-            finished_at: datetime,
-            status: RunStatus,
-            error: str | None,
-            output_path: str | None,
-    ) -> None:
-        """Insert one attempt execution row for auditability."""
-
-        self._connection.execute(
-            """
-            INSERT INTO run_attempts (
-                scheduled_run_id, started_at, finished_at, status, error, output_path
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                run_id,
-                started_at.isoformat(),
-                finished_at.isoformat(),
-                status,
-                error[:2000] if error else None,
-                output_path,
-            ),
         )
 
     def recover_stale_running(self, now_utc: datetime, stale_minutes: int) -> int:

@@ -115,7 +115,6 @@ class ScheduleDispatcherService:
 
         status = match.event.status if isinstance(match.event.status, dict) else {}
         status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
-        state = str(status_type.get("state") or "unknown").lower()
         detail = str(status_type.get("detail") or status.get("detail") or "")
         minute = self._extract_minute(detail=detail)
         home_score = self._find_score(match=match, side="home")
@@ -123,7 +122,6 @@ class ScheduleDispatcherService:
         return MatchSnapshotRecord(
             event_id=match.event.id or "unknown",
             captured_at=datetime.now(timezone.utc),
-            status_state=state,
             minute=minute,
             home_score=home_score,
             away_score=away_score,
