@@ -99,6 +99,23 @@ Se non ci sono partite eleggibili, il comando termina senza file markdown.
 
 File: `output\current_week_matches.json`
 
+Timezone handling
+
+Kickoff times and timestamps stored by the scheduler and written to the DB are normalized to UTC (field `kickoff_utc` in the database and ISO datetime strings in the JSON output). When you compare times with web pages or local calendars, those services typically display a *local* time zone. To reproduce the same local view, convert the stored UTC timestamp to the desired timezone. Example (Python 3.9+):
+
+```python
+from datetime import datetime, timezone
+import zoneinfo
+
+iso = '2026-04-22T08:30:00+00:00'  # kickoff_utc from DB
+utc_dt = datetime.fromisoformat(iso)
+local_tz = zoneinfo.ZoneInfo('Europe/Rome')
+local_dt = utc_dt.astimezone(local_tz)
+print(local_dt.strftime('%Y-%m-%d %H:%M %Z'))  # 2026-04-22 10:30 CEST
+```
+
+If you prefer a different behaviour (for example persisting the original raw date string `kickoff_raw` or also adding a `kickoff_local` field), that change is straightforward and can be added on request.
+
 Struttura ad alto livello:
 
 ```json
