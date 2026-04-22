@@ -43,9 +43,8 @@ class RunRepository:
             cursor = self._connection.execute(
                 """
                 INSERT OR IGNORE INTO scheduled_runs (
-                    event_id, run_type, scheduled_for_utc, status, attempt_count,
-                    claimed_at, finished_at, error
-                ) VALUES (?, ?, ?, 'pending', 0, NULL, NULL, NULL)
+                    event_id, run_type, scheduled_for_utc, status, finished_in, error
+                ) VALUES (?, ?, ?, 'pending', 0, NULL)
                 """,
                 (event_id, run_type, scheduled_iso),
             )
@@ -87,8 +86,8 @@ class RunRepository:
             """
             UPDATE scheduled_runs
             SET status = 'running',
-                claimed_at = ?,
-                attempt_count = attempt_count + 1
+                ,
+                
             WHERE id = ?
             """,
             (claimed_at, row["id"]),
@@ -122,11 +121,11 @@ class RunRepository:
         )
 
     def mark_failed(
-        self,
-        run_id: int,
-        finished_at: datetime,
-        error: str,
-        max_attempts: int,
+            self,
+            run_id: int,
+            finished_at: datetime,
+            error: str,
+            max_attempts: int,
     ) -> RunStatus:
         """Mark one run as failed or requeue pending when retry is allowed.
 
@@ -162,10 +161,10 @@ class RunRepository:
         return status
 
     def mark_skipped(
-        self,
-        run_id: int,
-        finished_at: datetime,
-        reason: str,
+            self,
+            run_id: int,
+            finished_at: datetime,
+            reason: str,
     ) -> None:
         """Mark one run as skipped."""
 
@@ -181,13 +180,13 @@ class RunRepository:
         )
 
     def add_attempt(
-        self,
-        run_id: int,
-        started_at: datetime,
-        finished_at: datetime,
-        status: RunStatus,
-        error: str | None,
-        output_path: str | None,
+            self,
+            run_id: int,
+            started_at: datetime,
+            finished_at: datetime,
+            status: RunStatus,
+            error: str | None,
+            output_path: str | None,
     ) -> None:
         """Insert one attempt execution row for auditability."""
 
@@ -224,8 +223,8 @@ class RunRepository:
             UPDATE scheduled_runs
             SET status = 'pending',
                 error = COALESCE(error, 'Recovered stale running job'),
-                claimed_at = NULL
-            WHERE status = 'running' AND claimed_at IS NOT NULL AND claimed_at < ?
+                
+            WHERE status = 'running' AND 
             """,
             (stale_before.isoformat(),),
         )
@@ -240,8 +239,7 @@ class RunRepository:
             run_type=row["run_type"],
             scheduled_for_utc=self._parse_iso_datetime(row["scheduled_for_utc"]),
             status=row["status"],
-            attempt_count=int(row["attempt_count"]),
-            claimed_at=self._parse_nullable_datetime(row["claimed_at"]),
+
             finished_at=self._parse_nullable_datetime(row["finished_at"]),
             error=row["error"],
         )
@@ -261,4 +259,3 @@ class RunRepository:
         if raw_value is None:
             return None
         return self._parse_iso_datetime(raw_value)
-
