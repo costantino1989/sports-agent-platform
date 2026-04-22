@@ -23,7 +23,10 @@ ODDS_ROW_PATTERN = re.compile(
 
 
 class ScheduleDispatcherService:
-    """Run one scheduler tick: sync, recover stale jobs, claim and execute due runs."""
+    """Service for syncing weekly matches into SQLite and ensuring minute30/minute60 scheduled runs.
+
+    This dispatcher no longer executes scheduled runs. Use the CLI '--schedule-sync' to populate the DB.
+    """
 
     def __init__(
         self,
@@ -71,11 +74,6 @@ class ScheduleDispatcherService:
             skipped_runs=0,
         )
 
-    def run_tick(self) -> ScheduleTickResult:
-        """Deprecated: full scheduler tick removed. Delegate to sync_only()."""
-
-        LOGGER.info("run_tick is deprecated; --schedule-tick removed. Delegating to sync_only().")
-        return self.sync_only()
 
     def _build_snapshot(self, match: MatchRecordModel, source: str) -> MatchSnapshotRecord:
         """Build append-only snapshot from one match payload."""

@@ -5,7 +5,7 @@ Tool CLI Python per raccogliere partite calcio da ESPN e generare output per ana
 ## Requisiti
 
 - Python `>= 3.12`
-- Dipendenze dal `pyproject.toml` (attualmente: `pydantic`)
+- Dipendenze dal `pyproject.toml` (LangChain/LangGraph/Ollama incluse)
 
 ## Installazione
 
@@ -51,6 +51,23 @@ Output di default: `output\match_markdowns`.
 python main.py --build-markdowns --markdown-dir output\my_markdowns
 ```
 
+### 5. Flusso end-to-end predizione 1X2 (LangGraph + Ollama)
+
+```powershell
+python main.py --predict-1x2
+```
+
+Output predizioni di default: `output\predictions_1x2.md`.
+
+### 6. Sync scheduler (persistenza SQLite + job minute30/minute60)
+
+```powershell
+python main.py --schedule-sync
+```
+
+Default DB path: `output\schedule_state.db`.
+
+
 ## Regole di selezione per `--build-markdowns`
 
 Vengono incluse solo le partite che rispettano tutte le condizioni:
@@ -67,10 +84,14 @@ Se non ci sono partite eleggibili, il comando termina senza file markdown.
 |---|---|---|---|
 | `--build-markdowns` | flag | `False` | Genera un markdown per ogni match live eleggibile (oggi, in corso, >=10 min). |
 | `--save-current-week` | flag | `False` | Salva le partite della settimana corrente. |
+| `--predict-1x2` | flag | `False` | Flusso unico: genera i dossier markdown e poi produce un file markdown unico con predizioni 1X2. |
+| `--schedule-sync` | flag | `False` | Sincronizza i match settimanali su SQLite e crea job per minuto 30 e minuto 60. |
 | `--markdown-dir` | path | `output\match_markdowns` | Directory di output markdown. |
 | `--weekly-output` | path | `output\current_week_matches.json` | File JSON output per il flusso weekly. |
+| `--prediction-output` | path | `output\predictions_1x2.md` | File markdown unico con tabella predizioni 1X2. |
+| `--schedule-db` | path | `output\schedule_state.db` | Path SQLite usato dalla schedulazione. |
 
-`--build-markdowns` e `--save-current-week` sono mutualmente esclusivi.
+`--build-markdowns`, `--save-current-week`, `--predict-1x2` e `--schedule-sync` sono mutualmente esclusivi.
 
 ## Formato output
 
@@ -114,6 +135,18 @@ Naming file: `<league_slug>_<event_id>.md` (esempio: `eng_3_745657.md`).
 
 Il dossier mantiene 14 sezioni; dalla sezione 4 in poi è reso in modo più conversazionale/tabellare (non dump JSON grezzo) con sanificazione dei campi tecnici non utili (`href`, `$ref`, `uid`, `id`, campi vuoti).
 
+### Predizioni 1X2 markdown
+
+File: `output\predictions_1x2.md`
+
+La tabella contiene una riga per match con:
+
+- match
+- risultato predetto (1/X/2)
+- probabilità di successo
+- motivazione dettagliata con riferimenti evidenze
+- campo outcome vuoto (da valorizzare in futuro)
+
 ## Log
 
 Logger colorato in console:
@@ -124,6 +157,17 @@ Logger colorato in console:
 - `ERROR`: rosso
 
 Ogni riga include timestamp, classe/modulo e numero riga.
+
+## Configurazione Ollama (predizione 1X2)
+
+Variabili `.env` utilizzate:
+
+- `OLLAMA_MODEL` (default: `gemma4:latest`)
+- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
+- `TERMINAL_TIMEOUT_SECONDS` (default: `45`)
+- `SCHEDULE_DB_PATH` (default: `output\schedule_state.db`)
+- `SCHEDULE_STALE_MINUTES` (default: `30`)
+- `SCHEDULE_MAX_ATTEMPTS` (default: `2`)
 
 ## Help
 
