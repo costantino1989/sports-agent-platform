@@ -101,20 +101,28 @@ File: `output\current_week_matches.json`
 
 Timezone handling
 
-Kickoff times and timestamps stored by the scheduler and written to the DB are normalized to UTC (field `kickoff_utc` in the database and ISO datetime strings in the JSON output). When you compare times with web pages or local calendars, those services typically display a *local* time zone. To reproduce the same local view, convert the stored UTC timestamp to the desired timezone. Example (Python 3.9+):
+By default the scheduler attempts to persist kickoff and scheduled times using the Europe/Rome timezone (ISO strings including the zone offset) so they match the local display you see on many web pages. This localized storage requires the system tzdata to be available (on some Windows Python installs tzdata is not bundled).
+
+If tzdata is unavailable the code falls back to storing UTC ISO datetimes (preserving internal correctness). To enable localized storage, install tzdata into the runtime environment:
+
+```powershell
+pip install tzdata
+```
+
+Example: convert a UTC ISO timestamp to Europe/Rome for display (Python 3.9+):
 
 ```python
 from datetime import datetime, timezone
 import zoneinfo
 
-iso = '2026-04-22T08:30:00+00:00'  # kickoff_utc from DB
+iso = '2026-04-22T08:30:00+00:00'  # UTC timestamp from DB
 utc_dt = datetime.fromisoformat(iso)
 local_tz = zoneinfo.ZoneInfo('Europe/Rome')
 local_dt = utc_dt.astimezone(local_tz)
 print(local_dt.strftime('%Y-%m-%d %H:%M %Z'))  # 2026-04-22 10:30 CEST
 ```
 
-If you prefer a different behaviour (for example persisting the original raw date string `kickoff_raw` or also adding a `kickoff_local` field), that change is straightforward and can be added on request.
+If you prefer a different behaviour (for example persisting the original raw date string `kickoff_raw` or also adding an explicit `kickoff_local` field), that change is straightforward and can be added on request.
 
 Struttura ad alto livello:
 
