@@ -116,10 +116,6 @@ class ScheduleIngestionService:
             event_id=event_id,
             competition_id=competition_id,
         )
-        status_state = self._extract_status_state(
-            weekly_match.event.status,
-            weekly_match.competition.status,
-        )
         home_team = self._find_team_name(weekly_match=weekly_match, side="home")
         away_team = self._find_team_name(weekly_match=weekly_match, side="away")
         return MatchScheduleRecord(
@@ -128,7 +124,6 @@ class ScheduleIngestionService:
             league_name=league_name,
             competition_id=competition_id,
             kickoff_utc=kickoff_utc,
-            status_state=status_state,
             home_team=home_team,
             away_team=away_team,
             payload_json=json.dumps(
@@ -209,23 +204,6 @@ class ScheduleIngestionService:
             parsed = parsed.replace(tzinfo=ZoneInfo("Europe/Rome"))
         return parsed.astimezone(ZoneInfo("Europe/Rome"))
 
-    @staticmethod
-    def _extract_status_state(
-        event_status: dict[str, object] | None,
-        competition_status: dict[str, object] | None,
-    ) -> str:
-        """Extract one lowercase status state from weekly status objects."""
-
-        for status in (event_status, competition_status):
-            if not isinstance(status, dict):
-                continue
-            status_type = status.get("type")
-            if not isinstance(status_type, dict):
-                continue
-            state = status_type.get("state")
-            if isinstance(state, str) and state:
-                return state.lower()
-        return "unknown"
 
     @staticmethod
     def _find_team_name(weekly_match: WeeklyMatchModel, side: str) -> str:

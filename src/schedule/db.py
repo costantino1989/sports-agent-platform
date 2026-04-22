@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS matches (
     league_name TEXT NOT NULL,
     competition_id TEXT NOT NULL,
     kickoff_utc TEXT NOT NULL,
-    status_state TEXT NOT NULL,
+
     home_team TEXT NOT NULL,
     away_team TEXT NOT NULL,
     payload_json TEXT NOT NULL,

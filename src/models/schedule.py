@@ -26,7 +26,6 @@ class MatchScheduleRecord(ScheduleBaseModel):
         league_name: Human-readable league name.
         competition_id: ESPN competition identifier.
         kickoff_utc: Kickoff in UTC.
-        status_state: Last known ESPN state.
         home_team: Home team display name.
         away_team: Away team display name.
         payload_json: Serialized MatchRecordModel payload.
@@ -38,7 +37,6 @@ class MatchScheduleRecord(ScheduleBaseModel):
     league_name: str = Field(description="Human-readable league name.")
     competition_id: str = Field(description="ESPN competition identifier.")
     kickoff_utc: datetime = Field(description="Kickoff in UTC.")
-    status_state: str = Field(description="Last known ESPN state.")
     home_team: str = Field(description="Home team display name.")
     away_team: str = Field(description="Away team display name.")
     payload_json: str = Field(description="Serialized MatchRecordModel payload.")

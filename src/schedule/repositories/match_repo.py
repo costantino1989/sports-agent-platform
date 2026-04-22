@@ -46,7 +46,6 @@ class MatchRepository:
                     record.league_name,
                     record.competition_id,
                     kickoff_iso,
-                    record.status_state,
                     record.home_team,
                     record.away_team,
                     record.payload_json,
@@ -57,14 +56,13 @@ class MatchRepository:
             """
             INSERT INTO matches (
                 event_id, league_slug, league_name, competition_id, kickoff_utc,
-                status_state, home_team, away_team, payload_json, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                home_team, away_team, payload_json, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(event_id) DO UPDATE SET
                 league_slug=excluded.league_slug,
                 league_name=excluded.league_name,
                 competition_id=excluded.competition_id,
                 kickoff_utc=excluded.kickoff_utc,
-                status_state=excluded.status_state,
                 home_team=excluded.home_team,
                 away_team=excluded.away_team,
                 payload_json=excluded.payload_json,
@@ -87,7 +85,7 @@ class MatchRepository:
         row = self._connection.execute(
             """
             SELECT event_id, league_slug, league_name, competition_id, kickoff_utc,
-                   status_state, home_team, away_team, payload_json, updated_at
+                   home_team, away_team, payload_json, updated_at
             FROM matches
             WHERE event_id = ?
             """,
@@ -101,7 +99,6 @@ class MatchRepository:
             league_name=row["league_name"],
             competition_id=row["competition_id"],
             kickoff_utc=self._parse_iso_datetime(row["kickoff_utc"]),
-            status_state=row["status_state"],
             home_team=row["home_team"],
             away_team=row["away_team"],
             payload_json=row["payload_json"],
