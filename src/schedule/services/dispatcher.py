@@ -59,8 +59,43 @@ class ScheduleDispatcherService:
         self._max_attempts = max(1, max_attempts)
 
     def sync_only(self) -> ScheduleTickResult:
-        """Run only DB sync without executing due jobs."""
+        """Run only DB sync without executing due jobs.
 
+        This method enforces API-only ingestion. The configured ingestion
+        service must use the ESPN API (WeeklyMatchesAction ->
+        WeeklyScoreboardCollector -> EspnSoccerClient). If the configured
+        ingestion pipeline does not match this contract, an exception is
+        raised to avoid file-based or alternate ingestion paths.
+        """
+
+        # Defensive checks to ensure ingestion comes from ESPN API
+        try:
+            from src.weekly.action import WeeklyMatchesAction
+            from src.weekly.fetching import WeeklyScoreboardCollector
+            from src.espn import EspnSoccerClient
+        except Exception as exc:  # pragma: no cover - import safety
+            LOGGER.error("Failed importing weekly API components: %s", exc)
+            raise RuntimeError("Required weekly API components are unavailable.") from exc
+
+        weekly_action = getattr(self._ingestion_service, "_weekly_action", None)
+        if not isinstance(weekly_action, WeeklyMatchesAction):
+            raise RuntimeError(
+                "Ingestion service must be configured with WeeklyMatchesAction for API-only sync."
+            )
+
+        collector = getattr(weekly_action, "_collector", None)
+        if not isinstance(collector, WeeklyScoreboardCollector):
+            raise RuntimeError(
+                "WeeklyMatchesAction must use WeeklyScoreboardCollector for API-only sync."
+            )
+
+        client = getattr(collector, "_client", None)
+        if not isinstance(client, EspnSoccerClient):
+            raise RuntimeError(
+                "WeeklyScoreboardCollector must use EspnSoccerClient for API-only sync."
+            )
+
+        # Proceed with the ingestion sync which will use the API-backed weekly action
         synced_matches, ensured_runs = self._ingestion_service.sync()
         LOGGER.info(
             f"Schedule sync completed: synced_matches={synced_matches}, ensured_runs={ensured_runs}."
