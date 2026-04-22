@@ -207,7 +207,8 @@ class MatchFlowRenderer:
 
         return self._extractor.extract_status_detail(data=data)
 
-    def _extract_venue_address(self, competition: JsonDict | list[Any] | None) -> tuple[str, str]:
+    @staticmethod
+    def _extract_venue_address(competition: JsonDict | list[Any] | None) -> tuple[str, str]:
         """Extract venue city and country from competition payload.
 
         Args:
@@ -229,7 +230,8 @@ class MatchFlowRenderer:
             return as_text(None), as_text(None)
         return as_text(address.get("city")), as_text(address.get("country"))
 
-    def _extract_competition_group(self, competition: JsonDict | list[Any] | None) -> str:
+    @staticmethod
+    def _extract_competition_group(competition: JsonDict | list[Any] | None) -> str:
         """Extract competition group name or abbreviation.
 
         Args:
@@ -250,7 +252,8 @@ class MatchFlowRenderer:
                     return candidate.strip()
         return as_text(None)
 
-    def _extract_match_officials(self, competition: JsonDict | list[Any] | None) -> str:
+    @staticmethod
+    def _extract_match_officials(competition: JsonDict | list[Any] | None) -> str:
         """Extract resolved match officials list from competition payload.
 
         Args:
@@ -320,7 +323,8 @@ class MatchFlowRenderer:
         rows = [[metric_labels[key], *values_by_metric.get(key, ["N/A"] * team_count)] for key in metric_order]
         return headers, rows
 
-    def _extract_team_name(self, competitor: JsonDict, index: int) -> str:
+    @staticmethod
+    def _extract_team_name(competitor: JsonDict, index: int) -> str:
         """Extract team display name from one competitor object."""
 
         team = competitor.get("team")
@@ -328,7 +332,8 @@ class MatchFlowRenderer:
             return as_text(team.get("displayName") or team.get("name"), f"Team {index + 1}")
         return as_text(competitor.get("displayName"), f"Team {index + 1}")
 
-    def _extract_stat_entries(self, competitor: JsonDict) -> list[JsonDict]:
+    @staticmethod
+    def _extract_stat_entries(competitor: JsonDict) -> list[JsonDict]:
         """Extract list of statistic dictionaries from competitor payload."""
 
         stats = competitor.get("statistics")
@@ -336,7 +341,8 @@ class MatchFlowRenderer:
             return []
         return [item for item in stats if isinstance(item, dict)]
 
-    def _extract_stat_key(self, stat: JsonDict) -> str:
+    @staticmethod
+    def _extract_stat_key(stat: JsonDict) -> str:
         """Build a normalized key for one statistic entry."""
 
         raw_name = stat.get("name") or stat.get("displayName") or stat.get("abbreviation")
@@ -344,7 +350,8 @@ class MatchFlowRenderer:
             return "unknown"
         return raw_name.replace(" ", "").replace("_", "").lower()
 
-    def _extract_stat_label(self, stat: JsonDict) -> str:
+    @staticmethod
+    def _extract_stat_label(stat: JsonDict) -> str:
         """Build display label for one statistic entry."""
 
         raw_label = stat.get("displayName") or stat.get("name") or stat.get("abbreviation")
@@ -357,7 +364,8 @@ class MatchFlowRenderer:
             return "Unknown stat"
         return f"{normalized[0].upper()}{normalized[1:]}"
 
-    def _extract_stat_value(self, stat: JsonDict) -> str:
+    @staticmethod
+    def _extract_stat_value(stat: JsonDict) -> str:
         """Extract display value for one statistic entry."""
 
         value = stat.get("displayValue")
@@ -365,7 +373,8 @@ class MatchFlowRenderer:
             value = stat.get("value")
         return as_text(value)
 
-    def _no_data(self, section_name: str) -> str:
+    @staticmethod
+    def _no_data(section_name: str) -> str:
         """Build standardized no-data fallback text."""
 
         return NO_DATA_TEMPLATE.format(section=section_name)

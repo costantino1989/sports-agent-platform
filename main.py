@@ -15,8 +15,8 @@ from src.dossier import (
     TodayInProgressSelector,
 )
 from src.espn import EspnSoccerClient
+from src.schedule.weekly import WeeklyMatchesAction
 from src.utils import get_logger, get_runtime_config
-from src.weekly import WeeklyMatchesAction
 
 if TYPE_CHECKING:
     from src.prediction import PredictionMarkdownPipeline
@@ -154,11 +154,7 @@ def parse_arguments() -> argparse.Namespace:
             "started at least 10 minutes ago."
         ),
     )
-    mode_group.add_argument(
-        "--save-current-week",
-        action="store_true",
-        help="Save scheduled matches for the current week.",
-    )
+
     mode_group.add_argument(
         "--predict-1x2",
         action="store_true",
@@ -178,12 +174,7 @@ def parse_arguments() -> argparse.Namespace:
         default=Path("output") / "match_markdowns",
         help="Destination directory for per-match markdown dossiers.",
     )
-    parser.add_argument(
-        "--weekly-output",
-        type=Path,
-        default=Path("output") / "current_week_matches.json",
-        help="Destination JSON path for current-week scheduled matches.",
-    )
+
     parser.add_argument(
         "--prediction-output",
         type=Path,
@@ -204,6 +195,45 @@ def main() -> None:
 
     arguments = parse_arguments()
     shared_client = EspnSoccerClient()
+
+    if arguments.schedule_sync:
+        LOGGER.info(
+            "Starting scheduler flow (SQLite persistence + minute30/minute60 triggers)."
+        )
+        dispatcher, schedule_connection = build_schedule_dispatcher(
+            client=shared_client,
+            db_path=arguments.schedule_db,
+            output_dir=arguments.markdown_dir,
+        )
+        try:
+            result = dispatcher.sync_only()
+        finally:
+            schedule_connection.close()
+        LOGGER.info(
+            "Scheduler result: "
+            f"synced_matches={result.synced_matches}, ensured_runs={result.ensured_runs}."
+        )
+        return
+
+    if arguments.build_markdowns and not arguments.predict_1x2:
+        LOGGER.info(
+            "Selecting today's in-progress matches started at least 10 minutes ago."
+        )
+        selector = build_today_selector(client=shared_client)
+        selected_matches = selector.run()
+        if not selected_matches:
+            LOGGER.warn("No eligible in-progress matches found for markdown generation.")
+        LOGGER.info("Starting per-match markdown dossier generation.")
+        dossier_action = build_dossier_action(client=shared_client)
+        markdown_files = dossier_action.run(
+            matches=selected_matches,
+            output_dir=arguments.markdown_dir,
+        )
+        LOGGER.info(
+            f"Saved {len(markdown_files)} match markdown files to {arguments.markdown_dir}"
+        )
+        return
+
     if arguments.predict_1x2:
         LOGGER.info(
             "Starting end-to-end 1X2 workflow."
@@ -226,57 +256,6 @@ def main() -> None:
             f"{prediction_output}"
         )
         return
-
-    if arguments.schedule_sync:
-        LOGGER.info(
-            "Starting scheduler flow (SQLite persistence + minute30/minute60 triggers)."
-        )
-        dispatcher, schedule_connection = build_schedule_dispatcher(
-            client=shared_client,
-            db_path=arguments.schedule_db,
-            output_dir=arguments.markdown_dir,
-        )
-        try:
-            result = dispatcher.sync_only()
-        finally:
-            schedule_connection.close()
-        LOGGER.info(
-            "Scheduler result: "
-            f"synced_matches={result.synced_matches}, ensured_runs={result.ensured_runs}."
-        )
-        return
-
-    if arguments.build_markdowns:
-        LOGGER.info(
-            "Selecting today's in-progress matches started at least 10 minutes ago."
-        )
-        selector = build_today_selector(client=shared_client)
-        selected_matches = selector.run()
-        if not selected_matches:
-            LOGGER.warn("No eligible in-progress matches found for markdown generation.")
-        LOGGER.info("Starting per-match markdown dossier generation.")
-        dossier_action = build_dossier_action(client=shared_client)
-        markdown_files = dossier_action.run(
-            matches=selected_matches,
-            output_dir=arguments.markdown_dir,
-        )
-        LOGGER.info(
-            f"Saved {len(markdown_files)} match markdown files to {arguments.markdown_dir}"
-        )
-        return
-
-    if arguments.save_current_week or (
-            not arguments.build_markdowns
-            and not arguments.predict_1x2
-            and not arguments.schedule_sync
-    ):
-        LOGGER.info("Starting current-week match collection.")
-        weekly_action = build_weekly_action(client=shared_client)
-        weekly_payload = weekly_action.run(output_path=arguments.weekly_output)
-        LOGGER.info(
-            f"Saved {weekly_payload.match_count} weekly matches to "
-            f"{arguments.weekly_output}"
-        )
 
 
 if __name__ == "__main__":

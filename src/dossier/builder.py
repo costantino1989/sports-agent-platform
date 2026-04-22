@@ -207,25 +207,29 @@ class MatchDossierBuilder:
             ),
         )
 
-    def _build_file_name(self, match: MatchRecordModel) -> str:
+    @staticmethod
+    def _build_file_name(match: MatchRecordModel) -> str:
         """Build stable markdown filename from league/event identifiers."""
 
         league = match.league.slug.replace(".", "_")
         event_id = (match.event.id or "unknown").replace("/", "_")
         return f"{league}_{event_id}.md"
 
-    def _build_match_reference(self, match: MatchRecordModel) -> str:
+    @staticmethod
+    def _build_match_reference(match: MatchRecordModel) -> str:
         """Build concise timing-log reference from league slug and event ID."""
 
         event_id = match.event.id or "unknown"
         return f"{match.league.slug}:{event_id}"
 
-    def _payload_state(self, payload: EndpointPayload) -> str:
+    @staticmethod
+    def _payload_state(payload: EndpointPayload) -> str:
         """Describe payload availability in compact log-friendly format."""
 
         return "ok" if payload.has_data() else "empty"
 
-    def _elapsed_seconds(self, start: float) -> float:
+    @staticmethod
+    def _elapsed_seconds(start: float) -> float:
         """Compute elapsed wall-clock seconds from a perf-counter start."""
 
         return perf_counter() - start

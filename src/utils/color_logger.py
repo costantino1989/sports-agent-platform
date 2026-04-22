@@ -86,7 +86,8 @@ class ColorLogger:
         color = self._LEVEL_COLORS[level]
         print(f"{color}{entry}{self._COLOR_RESET}")
 
-    def _build_entry(self, level: str, message: str, context: LogCallerContext) -> str:
+    @staticmethod
+    def _build_entry(level: str, message: str, context: LogCallerContext) -> str:
         """Build a normalized log entry string.
 
         Args:
@@ -127,7 +128,8 @@ class ColorLogger:
         finally:
             del frame
 
-    def _extract_class_name(self, caller_frame: FrameType) -> str:
+    @staticmethod
+    def _extract_class_name(caller_frame: FrameType) -> str:
         """Extract class name from a caller frame.
 
         Args:

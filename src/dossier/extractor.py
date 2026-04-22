@@ -96,7 +96,8 @@ class DossierDataExtractor:
             )
         return teams_data
 
-    def build_head_to_head(self, teams: list[TeamDossierData]) -> list[JsonDict]:
+    @staticmethod
+    def build_head_to_head(teams: list[TeamDossierData]) -> list[JsonDict]:
         """Build basic head-to-head entries from team schedules.
 
         Args:
@@ -192,7 +193,8 @@ class DossierDataExtractor:
             safe_fetcher=safe_fetcher,
         )
 
-    def _extract_role(self, player: JsonDict) -> str:
+    @staticmethod
+    def _extract_role(player: JsonDict) -> str:
         """Extract a role string for a player dictionary."""
 
         position = player.get("position")
@@ -202,8 +204,9 @@ class DossierDataExtractor:
             return position
         return "Unknown role"
 
+    @staticmethod
     def _build_player_description(
-        self, player: JsonDict, athlete_payload: EndpointPayload
+        player: JsonDict, athlete_payload: EndpointPayload
     ) -> str:
         """Build a short description for one player line."""
 
@@ -241,7 +244,8 @@ class DossierDataExtractor:
         enriched_payload["statistics"] = statistics_payload.data
         return EndpointPayload(data=enriched_payload, error=athlete_payload.error)
 
-    def _build_player_season_stats(self, athlete_payload: EndpointPayload, role: str) -> str:
+    @staticmethod
+    def _build_player_season_stats(athlete_payload: EndpointPayload, role: str) -> str:
         """Build concise season stats for one player line."""
 
         details = athlete_payload.data if isinstance(athlete_payload.data, dict) else None

@@ -220,7 +220,8 @@ class DossierFetchFacade:
                 return year_value
         return datetime.now(timezone.utc).year
 
-    def endpoint_payload(self, payload: JsonData) -> EndpointPayload:
+    @staticmethod
+    def endpoint_payload(payload: JsonData) -> EndpointPayload:
         """Convert raw payload to EndpointPayload with empty-data handling.
 
         Args:

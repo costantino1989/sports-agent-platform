@@ -6,7 +6,7 @@ import sqlite3
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from src.schedule.models import MatchScheduleRecord, MatchSnapshotRecord
+from src.models.schedule import MatchScheduleRecord, MatchSnapshotRecord
 
 
 class MatchRepository:

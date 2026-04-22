@@ -1,0 +1,24 @@
+You are analyzing one live-match dossier markdown file to produce a 1X2 prediction.
+
+Source file: {source_file}
+Match label: {match_label}
+
+Detected uncertainty signals:
+{signals_block}
+
+Use tools only when needed to reduce a specific uncertainty.
+Do not perform broad web search for completeness.
+
+Dossier markdown:
+```markdown
+{dossier_markdown}
+```
+
+Return ONLY valid JSON with this schema:
+{{
+  "match": "Home vs Away",
+  "predicted_result": "1|X|2",
+  "success_probability": 0-100 integer,
+  "rationale": "Detailed rationale with references to dossier and web evidence.",
+  "evidence_refs": ["ref 1", "ref 2"]
+}}

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from src.dossier import MatchDossierAction
 from src.models.live_models import MatchRecordModel
-from src.schedule.models import MatchSnapshotRecord, ScheduleTickResult
+from src.models.schedule import MatchSnapshotRecord, ScheduleTickResult
 from src.schedule.repositories import MatchRepository, RunRepository
 from src.schedule.services.ingestion import ScheduleIngestionService
 from src.utils import get_logger
@@ -29,14 +29,14 @@ class ScheduleDispatcherService:
     """
 
     def __init__(
-        self,
-        ingestion_service: ScheduleIngestionService,
-        match_repository: MatchRepository,
-        run_repository: RunRepository,
-        dossier_action: MatchDossierAction,
-        output_dir: Path,
-        stale_running_minutes: int = 30,
-        max_attempts: int = 2,
+            self,
+            ingestion_service: ScheduleIngestionService,
+            match_repository: MatchRepository,
+            run_repository: RunRepository,
+            dossier_action: MatchDossierAction,
+            output_dir: Path,
+            stale_running_minutes: int = 30,
+            max_attempts: int = 2,
     ) -> None:
         """Initialize dispatcher dependencies.
 
@@ -70,8 +70,9 @@ class ScheduleDispatcherService:
 
         # Defensive checks to ensure ingestion comes from ESPN API
         try:
-            from src.weekly.action import WeeklyMatchesAction
-            from src.weekly.fetching import WeeklyScoreboardCollector
+
+            from src.schedule.weekly import WeeklyMatchesAction
+            from src.schedule.weekly import WeeklyScoreboardCollector
             from src.espn import EspnSoccerClient
         except Exception as exc:  # pragma: no cover - import safety
             LOGGER.error("Failed importing weekly API components: %s", exc)
@@ -108,7 +109,6 @@ class ScheduleDispatcherService:
             failed_runs=0,
             skipped_runs=0,
         )
-
 
     def _build_snapshot(self, match: MatchRecordModel, source: str) -> MatchSnapshotRecord:
         """Build append-only snapshot from one match payload."""
@@ -155,7 +155,7 @@ class ScheduleDispatcherService:
         markdown_text = markdown_path.read_text(encoding="utf-8")
         captured_at = datetime.now(timezone.utc)
         for provider, snapshot, home, draw, away in self._extract_odds_rows(
-            markdown_text=markdown_text
+                markdown_text=markdown_text
         ):
             self._match_repository.add_odds_snapshot(
                 event_id=event_id,
@@ -179,8 +179,8 @@ class ScheduleDispatcherService:
             )
 
     def _extract_odds_rows(
-        self,
-        markdown_text: str,
+            self,
+            markdown_text: str,
     ) -> list[tuple[str, str, float | None, float | None, float | None]]:
         """Extract three-way odds rows from rendered markdown section 8."""
 
@@ -217,4 +217,3 @@ class ScheduleDispatcherService:
             return float(cleaned)
         except ValueError:
             return None
-

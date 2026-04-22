@@ -79,3 +79,19 @@ class MatchDossierAction:
             LOGGER.info(f"Saved markdown file: {dossier.output_path}")
         LOGGER.info(f"Generated {len(output_files)} markdown dossier files.")
         return output_files
+
+    def run_one(self, match: MatchRecordModel, output_dir: Path) -> Path | None:
+        """Generate markdown dossier for one target match.
+
+        Args:
+            match: Target match record.
+            output_dir: Target directory for markdown file.
+
+        Returns:
+            Output markdown path when generated.
+        """
+
+        output_files = self.run(matches=[match], output_dir=output_dir)
+        if not output_files:
+            return None
+        return output_files[0]

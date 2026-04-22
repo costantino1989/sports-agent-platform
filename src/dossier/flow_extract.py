@@ -63,7 +63,8 @@ class FlowDataExtractor:
                 return direct_detail.strip()
         return self._extract_summary_status_detail(summary_payload=sanitize_payload(data.summary.data))
 
-    def extract_boxscore_teams(self, summary_payload: JsonDict | list[Any] | None) -> list[JsonDict]:
+    @staticmethod
+    def extract_boxscore_teams(summary_payload: JsonDict | list[Any] | None) -> list[JsonDict]:
         """Extract team rows from `summary.boxscore.teams`."""
 
         if not isinstance(summary_payload, dict):
@@ -117,7 +118,8 @@ class FlowDataExtractor:
             )
         return rows
 
-    def _normalize_news_text(self, text: str) -> str:
+    @staticmethod
+    def _normalize_news_text(text: str) -> str:
         """Normalize article text to keep markdown tables valid and readable."""
 
         return " ".join(text.replace("|", "/").split())
@@ -184,7 +186,8 @@ class FlowDataExtractor:
                 )
         return rows
 
-    def extract_first_bool(self, payload: JsonDict | list[Any] | None, key: str) -> bool | None:
+    @staticmethod
+    def extract_first_bool(payload: JsonDict | list[Any] | None, key: str) -> bool | None:
         """Extract first boolean value for a key from nested payload."""
 
         if payload is None:
@@ -195,7 +198,8 @@ class FlowDataExtractor:
         value = matches[0].get(key)
         return value if isinstance(value, bool) else None
 
-    def extract_first_text(self, payload: JsonDict | list[Any] | None, key: str) -> str | None:
+    @staticmethod
+    def extract_first_text(payload: JsonDict | list[Any] | None, key: str) -> str | None:
         """Extract first text-compatible value for key from nested payload."""
 
         if payload is None:
@@ -205,7 +209,8 @@ class FlowDataExtractor:
             return None
         return as_text(matches[0].get(key))
 
-    def _extract_plays(self, payload: JsonDict | list[Any]) -> list[JsonDict]:
+    @staticmethod
+    def _extract_plays(payload: JsonDict | list[Any]) -> list[JsonDict]:
         """Extract play dictionaries from common payload shapes."""
 
         plays: list[JsonDict] = []
@@ -218,7 +223,8 @@ class FlowDataExtractor:
             plays = find_dicts_with_keys(payload, {"text"}, limit=80)
         return plays
 
-    def _extract_summary_status_detail(self, summary_payload: JsonDict | list[Any] | None) -> str:
+    @staticmethod
+    def _extract_summary_status_detail(summary_payload: JsonDict | list[Any] | None) -> str:
         """Extract live status detail from summary header payload."""
 
         if not isinstance(summary_payload, dict):
@@ -242,7 +248,8 @@ class FlowDataExtractor:
                 return detail.strip()
         return as_text(status.get("displayClock"), "Status unavailable")
 
-    def _extract_play_team_name(self, play: JsonDict) -> str:
+    @staticmethod
+    def _extract_play_team_name(play: JsonDict) -> str:
         """Extract play team name, with textual fallback from event text."""
 
         team = play.get("team")
@@ -259,7 +266,8 @@ class FlowDataExtractor:
                     return candidate
         return "N/A"
 
-    def _collect_odds_items(self, payload: JsonDict | list[Any]) -> list[JsonDict]:
+    @staticmethod
+    def _collect_odds_items(payload: JsonDict | list[Any]) -> list[JsonDict]:
         """Collect odds item dictionaries from common payload shapes."""
 
         odds_items: list[JsonDict] = []
@@ -272,12 +280,14 @@ class FlowDataExtractor:
             odds_items.extend([item for item in payload if isinstance(item, dict)])
         return odds_items
 
-    def _snapshot_sequence(self) -> tuple[tuple[str, str], ...]:
+    @staticmethod
+    def _snapshot_sequence() -> tuple[tuple[str, str], ...]:
         """Return preferred odds snapshots in display order."""
 
         return (("current", "Current"), ("close", "Close"), ("open", "Open"))
 
-    def _extract_provider_name(self, item: JsonDict) -> str:
+    @staticmethod
+    def _extract_provider_name(item: JsonDict) -> str:
         """Extract provider display name from one odds item."""
 
         provider = item.get("provider")
@@ -427,14 +437,16 @@ class FlowDataExtractor:
             return "N/A"
         return self._format_number(numeric)
 
-    def _american_to_decimal(self, american: float) -> float:
+    @staticmethod
+    def _american_to_decimal(american: float) -> float:
         """Convert one American odds value into decimal odds."""
 
         if american >= 0:
             return 1.0 + (american / 100.0)
         return 1.0 + (100.0 / abs(american))
 
-    def _parse_american_string(self, value: str) -> float | None:
+    @staticmethod
+    def _parse_american_string(value: str) -> float | None:
         """Parse American odds strings like '+125' or '-160'."""
 
         candidate = value.strip()
@@ -465,7 +477,8 @@ class FlowDataExtractor:
                 return f"+{self._format_number(parsed)}"
         return candidate
 
-    def _to_float(self, value: Any) -> float | None:
+    @staticmethod
+    def _to_float(value: Any) -> float | None:
         """Try converting supported values to float."""
 
         if isinstance(value, bool):
@@ -482,12 +495,14 @@ class FlowDataExtractor:
                 return None
         return None
 
-    def _format_number(self, value: float) -> str:
+    @staticmethod
+    def _format_number(value: float) -> str:
         """Format float values without unnecessary trailing zeroes."""
 
         return f"{value:.2f}".rstrip("0").rstrip(".")
 
-    def _describe_play_impact(self, play: JsonDict) -> str:
+    @staticmethod
+    def _describe_play_impact(play: JsonDict) -> str:
         """Translate play booleans into a human-readable impact label."""
 
         if play.get("scoringPlay") is True:

@@ -114,7 +114,8 @@ class MatchContextRenderer:
             return f"## 12. Rankings\n{self._no_data('Rankings')}"
         return "## 12. Rankings\n\n" + render_table(["Rank", "Team", "Rating", "Trend"], rows)
 
-    def _no_data(self, section_name: str) -> str:
+    @staticmethod
+    def _no_data(section_name: str) -> str:
         """Build standardized no-data fallback text."""
 
         return NO_DATA_TEMPLATE.format(section=section_name)

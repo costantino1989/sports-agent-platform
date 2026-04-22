@@ -50,7 +50,8 @@ class MatchMarkdownRenderer:
         ]
         return "\n\n".join(sections).strip() + "\n"
 
-    def _render_match_snapshot(self, data: MatchDossierData) -> str:
+    @staticmethod
+    def _render_match_snapshot(data: MatchDossierData) -> str:
         """Render section 1 with live match snapshot."""
 
         match = data.match
@@ -136,7 +137,8 @@ class MatchMarkdownRenderer:
             return self._no_data(section_name=section_name)
         return self._json_block(payload.data)
 
-    def _no_data(self, section_name: str, reason: str | None = None) -> str:
+    @staticmethod
+    def _no_data(section_name: str, reason: str | None = None) -> str:
         """Build standardized no-data fallback text."""
 
         text = NO_DATA_TEMPLATE.format(section=section_name)
@@ -144,7 +146,8 @@ class MatchMarkdownRenderer:
             return f"{text} Fetch note: {reason}."
         return text
 
-    def _json_block(self, payload: JsonDict | list[Any] | None) -> str:
+    @staticmethod
+    def _json_block(payload: JsonDict | list[Any] | None) -> str:
         """Render payload as a truncated JSON markdown block."""
 
         serialized = json.dumps(payload, indent=2, ensure_ascii=False)
@@ -199,7 +202,8 @@ class MatchMarkdownRenderer:
                 break
         return rows
 
-    def _is_event_completed(self, event: JsonDict) -> bool:
+    @staticmethod
+    def _is_event_completed(event: JsonDict) -> bool:
         """Return whether a schedule event is marked as completed."""
         competitions = event.get("competitions")
         if not isinstance(competitions, list) or not competitions:
@@ -236,8 +240,8 @@ class MatchMarkdownRenderer:
         result = self._format_result(team_competitor=team_competitor, opponent_competitor=opponent_competitor)
         return [as_text(event.get("date")), fixture, result]
 
+    @staticmethod
     def _split_competitors(
-        self,
         competitors: list[Any],
         team_id: str,
     ) -> tuple[JsonDict | None, JsonDict | None]:
@@ -272,7 +276,8 @@ class MatchMarkdownRenderer:
         )
         return f"{outcome} {team_score}-{opponent_score}"
 
-    def _extract_score(self, competitor: JsonDict | None) -> str:
+    @staticmethod
+    def _extract_score(competitor: JsonDict | None) -> str:
         """Extract score text from one competitor dictionary."""
         if competitor is None:
             return "N/A"
@@ -281,8 +286,8 @@ class MatchMarkdownRenderer:
             return as_text(score.get("displayValue") or score.get("value"))
         return as_text(score)
 
+    @staticmethod
     def _extract_outcome(
-        self,
         team_competitor: JsonDict,
         team_score: str,
         opponent_score: str,

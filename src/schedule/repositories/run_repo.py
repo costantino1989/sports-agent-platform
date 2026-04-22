@@ -6,7 +6,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from src.schedule.models import RunStatus, RunType, ScheduledRunRecord
+from src.models.schedule import RunStatus, RunType, ScheduledRunRecord
 
 RUN_OFFSETS_MINUTES: tuple[tuple[RunType, int], ...] = (
     ("minute30", 30),

@@ -17,7 +17,7 @@ from src.models.live_models import (
     VenueIdentifiersModel,
 )
 from src.utils import get_logger
-from src.weekly.fetching import WeeklyScoreboardCollector
+from src.schedule.weekly import WeeklyScoreboardCollector
 
 JsonDict: TypeAlias = dict[str, Any]
 
@@ -187,7 +187,8 @@ class TodayInProgressSelector:
         threshold = now_utc - timedelta(minutes=self._min_started_minutes)
         return kickoff <= threshold
 
-    def _extract_status_state(self, status: Any) -> str | None:
+    @staticmethod
+    def _extract_status_state(status: Any) -> str | None:
         """Extract status type state from an ESPN status payload.
 
         Args:
@@ -228,7 +229,8 @@ class TodayInProgressSelector:
                 return parsed
         return None
 
-    def _parse_datetime(self, value: Any) -> datetime | None:
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime | None:
         """Parse one ISO datetime value from ESPN payloads.
 
         Args:
@@ -249,8 +251,8 @@ class TodayInProgressSelector:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc)
 
+    @staticmethod
     def _build_dedupe_key(
-        self,
         league_slug: str,
         event: JsonDict,
         competition: JsonDict,
@@ -318,7 +320,8 @@ class TodayInProgressSelector:
             ),
         )
 
-    def _extract_venue_identifiers(self, venue: JsonDict) -> VenueIdentifiersModel | None:
+    @staticmethod
+    def _extract_venue_identifiers(venue: JsonDict) -> VenueIdentifiersModel | None:
         """Extract typed venue identifiers from a competition payload.
 
         Args:
@@ -332,7 +335,8 @@ class TodayInProgressSelector:
             return None
         return VenueIdentifiersModel.model_validate(venue)
 
-    def _extract_team_identifiers(self, competitor: JsonDict) -> TeamIdentifiersModel:
+    @staticmethod
+    def _extract_team_identifiers(competitor: JsonDict) -> TeamIdentifiersModel:
         """Extract typed team identifiers from one competitor payload.
 
         Args:
