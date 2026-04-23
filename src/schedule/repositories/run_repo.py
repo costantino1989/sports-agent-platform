@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from src.models.live_models import MatchRecordModel
 from src.models.schedule import RunStatus, RunType, ScheduledRunRecord
 
 RUN_OFFSETS_MINUTES: tuple[tuple[RunType, int], ...] = (
@@ -119,6 +121,63 @@ class RunRepository:
             """,
             (reason[:2000], run_id),
         )
+
+    def get_pending_runs_due(self, lookahead_minutes: int = 1) -> list[MatchRecordModel]:
+        """Return MatchRecordModel instances for scheduled runs with status 'pending'
+        whose scheduled_for_utc is less than or equal to now (UTC) plus
+        `lookahead_minutes`.
+
+        The method reads the match payload stored in the `matches.payload_json`
+        column and validates it into a MatchRecordModel. Rows with missing or
+        unparsable payloads are skipped.
+        """
+
+        now_utc = datetime.now(timezone.utc)
+        threshold = now_utc + timedelta(minutes=lookahead_minutes)
+
+        cursor = self._connection.execute(
+            "SELECT id, event_id, scheduled_for_utc FROM scheduled_runs WHERE status = 'pending'"
+        )
+        rows = cursor.fetchall()
+
+        due_matches: list[MatchRecordModel] = []
+        for row in rows:
+            try:
+                scheduled_dt = self._parse_iso_datetime(row["scheduled_for_utc"])
+            except Exception:
+                # Skip rows with unparsable datetime values
+                continue
+            if scheduled_dt > threshold:
+                continue
+
+            event_id = row["event_id"]
+            match_row = self._connection.execute(
+                "SELECT payload_json FROM matches WHERE event_id = ?",
+                (event_id,),
+            ).fetchone()
+            if match_row is None:
+                # No persisted match for this event_id
+                continue
+
+            raw_payload = match_row["payload_json"]
+            try:
+                payload_obj = json.loads(raw_payload)
+            except Exception:
+                # Skip malformed JSON
+                continue
+
+            try:
+                match_model = MatchRecordModel.model_validate(payload_obj)
+            except Exception:
+                # Try to parse directly from JSON string as a fallback
+                try:
+                    match_model = MatchRecordModel.model_validate_json(raw_payload)
+                except Exception:
+                    continue
+
+            due_matches.append(match_model)
+
+        return due_matches
 
     def _map_run_row(self, row: sqlite3.Row) -> ScheduledRunRecord:
         """Map SQLite row to scheduled run dataclass."""

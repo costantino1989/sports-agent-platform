@@ -12,7 +12,6 @@ from src.dossier import (
     DossierDataExtractor,
     MatchDossierAction,
     MatchMarkdownRenderer,
-    TodayInProgressSelector,
 )
 from src.espn import EspnSoccerClient
 from src.schedule.weekly import WeeklyMatchesAction
@@ -43,19 +42,6 @@ def build_dossier_action(client: EspnSoccerClient) -> MatchDossierAction:
         extractor=extractor,
         renderer=renderer,
     )
-
-
-def build_today_selector(client: EspnSoccerClient) -> TodayInProgressSelector:
-    """Build today's in-progress match selector.
-
-    Args:
-        client: Shared ESPN HTTP client.
-
-    Returns:
-        Configured selector used before markdown generation.
-    """
-
-    return TodayInProgressSelector(client=client)
 
 
 def build_weekly_action(client: EspnSoccerClient) -> WeeklyMatchesAction:
@@ -218,8 +204,18 @@ def main() -> None:
         LOGGER.info(
             "Selecting today's in-progress matches started at least 10 minutes ago."
         )
-        selector = build_today_selector(client=shared_client)
-        selected_matches = selector.run()
+        dispatcher, schedule_connection = build_schedule_dispatcher(
+            client=shared_client,
+            db_path=arguments.schedule_db,
+            output_dir=arguments.markdown_dir,
+        )
+        try:
+            from src.schedule import RunRepository
+            run_repo = RunRepository(connection=schedule_connection)
+            selected_matches = run_repo.get_pending_runs_due()
+        finally:
+            schedule_connection.close()
+
         if not selected_matches:
             LOGGER.warn("No eligible in-progress matches found for markdown generation.")
         LOGGER.info("Starting per-match markdown dossier generation.")
@@ -237,8 +233,18 @@ def main() -> None:
         LOGGER.info(
             "Starting end-to-end 1X2 workflow."
         )
-        selector = build_today_selector(client=shared_client)
-        selected_matches = selector.run()
+        dispatcher, schedule_connection = build_schedule_dispatcher(
+            client=shared_client,
+            db_path=arguments.schedule_db,
+            output_dir=arguments.markdown_dir,
+        )
+        try:
+            from src.schedule import RunRepository
+            run_repo = RunRepository(connection=schedule_connection)
+            selected_matches = run_repo.get_pending_runs_due()
+        finally:
+            schedule_connection.close()
+
         dossier_action = build_dossier_action(client=shared_client)
         markdown_files = dossier_action.run(
             matches=selected_matches,
