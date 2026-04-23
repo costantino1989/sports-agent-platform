@@ -52,77 +52,23 @@ class RunRepository:
                 created += 1
         return created
 
-    def claim_due_run(self, now_utc: datetime) -> ScheduledRunRecord | None:
-        """Atomically claim one due pending run.
-
-        Args:
-            now_utc: Current UTC timestamp.
-
-        Returns:
-            Claimed run record when available.
-        """
-
-        claimed_at = now_utc.isoformat()
-        self._connection.execute("BEGIN IMMEDIATE")
-        try:
-            now_param = now_utc.astimezone(ZoneInfo("Europe/Rome")).isoformat()
-        except Exception:
-            now_param = now_utc.isoformat()
-        row = self._connection.execute(
-            """
-            SELECT id, event_id, run_type, scheduled_for_utc, status, finished_in, error
-            FROM scheduled_runs
-            WHERE status = 'pending' AND scheduled_for_utc <= ?
-            ORDER BY scheduled_for_utc ASC, id ASC
-            LIMIT 1
-            """,
-            (now_param,),
-        ).fetchone()
-        if row is None:
-            self._connection.execute("COMMIT")
-            return None
-        self._connection.execute(
-            """
-            UPDATE scheduled_runs
-            SET status = 'running',
-                ,
-                
-            WHERE id = ?
-            """,
-            (claimed_at, row["id"]),
-        )
-        claimed = self._connection.execute(
-            """
-            SELECT id, event_id, run_type, scheduled_for_utc, status, attempt_count,
-                   claimed_at, finished_at, error
-            FROM scheduled_runs
-            WHERE id = ?
-            """,
-            (row["id"],),
-        ).fetchone()
-        self._connection.execute("COMMIT")
-        if claimed is None:
-            return None
-        return self._map_run_row(claimed)
-
-    def mark_done(self, run_id: int, finished_at: datetime) -> None:
+    def mark_done(self, run_id: int, finished_in: int) -> None:
         """Mark one run as done."""
 
         self._connection.execute(
             """
             UPDATE scheduled_runs
             SET status = 'done',
-                finished_at = ?,
+                finished_in = ?,
                 error = NULL
             WHERE id = ?
             """,
-            (finished_at.isoformat(), run_id),
+            (finished_in, run_id),
         )
 
     def mark_failed(
             self,
             run_id: int,
-            finished_at: datetime,
             error: str,
             max_attempts: int,
     ) -> RunStatus:
@@ -130,7 +76,6 @@ class RunRepository:
 
         Args:
             run_id: Scheduled run identifier.
-            finished_at: Attempt completion timestamp.
             error: Error text.
             max_attempts: Maximum allowed attempts.
 
@@ -151,18 +96,16 @@ class RunRepository:
             """
             UPDATE scheduled_runs
             SET status = ?,
-                finished_at = ?,
                 error = ?
             WHERE id = ?
             """,
-            (status, finished_at.isoformat(), error[:2000], run_id),
+            (status, error[:2000], run_id),
         )
         return status
 
     def mark_skipped(
             self,
             run_id: int,
-            finished_at: datetime,
             reason: str,
     ) -> None:
         """Mark one run as skipped."""
@@ -171,36 +114,11 @@ class RunRepository:
             """
             UPDATE scheduled_runs
             SET status = 'skipped',
-                finished_at = ?,
                 error = ?
             WHERE id = ?
             """,
-            (finished_at.isoformat(), reason[:2000], run_id),
+            (reason[:2000], run_id),
         )
-
-    def recover_stale_running(self, now_utc: datetime, stale_minutes: int) -> int:
-        """Requeue stale running jobs older than configured threshold.
-
-        Args:
-            now_utc: Current UTC timestamp.
-            stale_minutes: Stale threshold in minutes.
-
-        Returns:
-            Number of rows moved back to pending.
-        """
-
-        stale_before = now_utc - timedelta(minutes=stale_minutes)
-        cursor = self._connection.execute(
-            """
-            UPDATE scheduled_runs
-            SET status = 'pending',
-                error = COALESCE(error, 'Recovered stale running job'),
-                
-            WHERE status = 'running' AND 
-            """,
-            (stale_before.isoformat(),),
-        )
-        return cursor.rowcount
 
     def _map_run_row(self, row: sqlite3.Row) -> ScheduledRunRecord:
         """Map SQLite row to scheduled run dataclass."""
