@@ -5,18 +5,42 @@ from __future__ import annotations
 import json
 from typing import Any, TypeAlias
 
+from src.dossier.baseline_section import render_baseline_section
 from src.dossier.schedule_events import extract_schedule_events
 from src.dossier.render_context import MatchContextRenderer
 from src.dossier.render_flow import MatchFlowRenderer
-from src.dossier.render_tools import as_text, render_table
+from src.dossier.render_tools import as_text, extract_live_snapshot, render_table
 from src.models.dossier import EndpointPayload, MatchDossierData, TeamDossierData
+from src.models.no_data import NO_DATA_TEMPLATE
 
 JsonDict: TypeAlias = dict[str, Any]
 
-NO_DATA_TEMPLATE = (
-    "No data found (source: ESPN API, section: {section}). "
-    "Suggested action: verify via web search."
-)
+
+def _match_live_competitor(
+    team: Any, by_id: dict[str, JsonDict], by_name: dict[str, JsonDict]
+) -> JsonDict | None:
+    """Match a record team to a live competitor by team id, then by name."""
+
+    team_id = str(team.team.id) if team.team.id is not None else ""
+    if team_id and team_id in by_id:
+        return by_id[team_id]
+    name_key = (team.team.display_name or "").strip().lower()
+    return by_name.get(name_key)
+
+
+def _snapshot_status_detail(
+    status_type: JsonDict, record_status: Any, is_live: bool
+) -> str:
+    """Resolve the human-readable status detail for the snapshot."""
+
+    detail = "N/A"
+    if isinstance(status_type, dict):
+        detail = str(status_type.get("detail") or status_type.get("description") or "N/A")
+    # The record may carry a top-level detail override; honor it only for a
+    # non-live (pre-match/from-record) render so live minute text wins.
+    if not is_live and isinstance(record_status, dict) and record_status.get("detail"):
+        detail = str(record_status["detail"])
+    return detail
 
 
 class MatchMarkdownRenderer:
@@ -47,6 +71,7 @@ class MatchMarkdownRenderer:
             self._context_renderer.render_rankings(data=data),
             self._flow_renderer.render_news(data=data, section_index=13),
             self._render_recent_team_results(data=data),
+            render_baseline_section(data=data),
         ]
         return "\n\n".join(sections).strip() + "\n"
 
@@ -55,19 +80,28 @@ class MatchMarkdownRenderer:
         """Render section 1 with live match snapshot."""
 
         match = data.match
-        status = match.event.status or {}
-        status_type = status.get("type", {}) if isinstance(status, dict) else {}
-        status_detail = "N/A"
-        if isinstance(status_type, dict):
-            status_detail = str(status_type.get("detail") or status_type.get("description") or "N/A")
-        if isinstance(status, dict) and status.get("detail"):
-            status_detail = str(status["detail"])
+        # Prefer the live summary header (same source as the live probe) so the
+        # snapshot agrees with the play-by-play; fall back to the stale record.
+        live_competitors, live_status_type = extract_live_snapshot(data.summary.data)
+        by_id = {c["team_id"]: c for c in live_competitors if c["team_id"]}
+        by_name = {
+            c["team_name"].strip().lower(): c for c in live_competitors if c["team_name"]
+        }
+        record_status = match.event.status or {}
+        record_status_type = (
+            record_status.get("type", {}) if isinstance(record_status, dict) else {}
+        )
+        status_type = live_status_type or record_status_type
+        status_detail = _snapshot_status_detail(
+            status_type, record_status, is_live=bool(live_status_type)
+        )
         score_rows: list[list[str]] = []
         scoreline_parts: list[str] = []
         for team in data.match.teams:
             team_name = team.team.display_name or team.team.name or team.side or "Unknown team"
-            side = as_text(team.side, "N/A").capitalize()
-            score = as_text(team.score)
+            live = _match_live_competitor(team, by_id, by_name)
+            score = live["score"] if live else as_text(team.score)
+            side = as_text(live["side"] if live else team.side, "N/A").capitalize()
             score_rows.append([side, team_name, score])
             scoreline_parts.append(f"{team_name} {score}")
         details = "\n".join(

@@ -10,14 +10,14 @@ from src.dossier.render_tools import (
     as_text,
     find_dicts_with_keys,
     format_utc_datetime,
+    prematch_odds_note,
     render_table,
     sanitize_payload,
 )
 from src.models.dossier import MatchDossierData
+from src.models.no_data import NO_DATA_TEMPLATE
 
 JsonDict: TypeAlias = dict[str, Any]
-
-NO_DATA_TEMPLATE = "No data found (source: ESPN API, section: {section}). Suggested action: verify via web search."
 
 
 class MatchFlowRenderer:
@@ -119,6 +119,9 @@ class MatchFlowRenderer:
             "Complete market view using ESPN odds snapshots (Current, Close, Open).",
             "",
         ]
+        live_note = prematch_odds_note(data.summary.data)
+        if live_note:
+            blocks.extend([live_note, ""])
         if three_way_rows:
             blocks.extend(
                 [

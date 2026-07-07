@@ -1,0 +1,303 @@
+<title>Pronostici 1X2 — scommesse & P/L</title>
+<style>
+  :root {
+    --bg: #0f141c;
+    --surface: #161d27;
+    --card: #1d2734;
+    --card-hover: #212c3b;
+    --line: #2a3441;
+    --text: #eef2f6;
+    --muted: #93a2b3;
+    --faint: #5f6f80;
+    --accent: #f5b13d;
+    --accent-dim: rgba(245, 177, 61, 0.14);
+    --accent-line: rgba(245, 177, 61, 0.38);
+    --won: #46c98b;
+    --won-dim: rgba(70, 201, 139, 0.13);
+    --lost: #f26d6d;
+    --lost-dim: rgba(242, 109, 109, 0.13);
+    --sans: "SF Pro Display", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --radius: 14px;
+    --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(120% 80% at 50% -10%, #16202c 0%, var(--bg) 60%) fixed;
+    color: var(--text); font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: clamp(20px,4vw,44px) clamp(16px,4vw,32px) 72px; }
+  .topnav { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
+  .topnav a { font-size: 13px; font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
+  .topnav a.active { color: var(--accent); border-color: var(--accent-line); background: var(--accent-dim); }
+  .topnav a:hover { color: var(--text); border-color: var(--accent-line); }
+
+  .masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: 11px; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+  h1 { margin: 0; font-size: clamp(28px,5vw,44px); font-weight: 800; letter-spacing: -.025em; text-wrap: balance; }
+  .masthead p { margin: 6px 0 0; color: var(--muted); font-size: 14px; max-width: 48ch; }
+  .sample-tag { display: inline-block; margin-top: 10px; font-size: 11px; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-line); padding: 3px 10px; border-radius: 999px; letter-spacing: .03em; }
+
+  /* ---- P/L panel ---- */
+  .pl { margin-top: 28px; }
+  .pl h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 12px; font-weight: 700; }
+  .pl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .tile .budget { font-size: 12px; color: var(--muted); }
+  .tile .end { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile .roi { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile.up .roi { color: var(--won); } .tile.down .roi { color: var(--lost); }
+  .tile .bar { height: 4px; border-radius: 999px; background: #131a23; margin-top: 10px; overflow: hidden; }
+  .tile .bar > i { display: block; height: 100%; }
+  .tile.up .bar > i { background: var(--won); } .tile.down .bar > i { background: var(--lost); }
+
+  /* ---- grid ---- */
+  .grid { margin-top: 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 16px; }
+
+  .card {
+    position: relative; display: flex; flex-direction: column; gap: 14px; text-align: left; width: 100%;
+    font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px; cursor: pointer; box-shadow: var(--shadow); overflow: hidden;
+    transition: transform .16s ease, border-color .16s ease, background .16s ease;
+  }
+  .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--faint); }
+  .card.won::before { background: var(--won); } .card.lost::before { background: var(--lost); } .card.pending::before { background: var(--accent); }
+  .card.won { background: linear-gradient(90deg, var(--won-dim), transparent 55%), var(--card); }
+  .card.lost { background: linear-gradient(90deg, var(--lost-dim), transparent 55%), var(--card); }
+  .card:hover, .card:focus-visible { transform: translateY(-3px); border-color: var(--accent-line); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
+  .league { text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .kickoff { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .kickoff .day { color: var(--faint); font-weight: 500; margin-right: 6px; }
+
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: .04em; text-transform: uppercase; }
+  .status.won { color: var(--won); background: var(--won-dim); border: 1px solid rgba(70,201,139,.4); }
+  .status.lost { color: var(--lost); background: var(--lost-dim); border: 1px solid rgba(242,109,109,.4); }
+  .status.pending { color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-line); }
+
+  .teams { display: flex; flex-direction: column; gap: 7px; }
+  .team { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: var(--muted); }
+  .team .pos { font-size: 10px; letter-spacing: .1em; color: var(--faint); width: 42px; flex: none; text-transform: uppercase; }
+  .team.pick { color: var(--text); }
+  .team .sc { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 800; color: var(--text); }
+
+  .bet-row { display: flex; align-items: center; gap: 10px; font-size: 13px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .chip { font-weight: 800; font-variant-numeric: tabular-nums; padding: 3px 9px; border-radius: 8px; background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-line); }
+  .bet-row .lbl { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .bet-row .odds { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bet-row .book { font-size: 11px; color: var(--muted); font-weight: 600; background: var(--surface); border: 1px solid var(--line); padding: 2px 7px; border-radius: 6px; }
+  .bet-row .lockmin { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .stake-line { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .stake-line b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stake-line span { color: var(--faint); }
+  .bet-row .prob { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .nobet { font-size: 12.5px; color: var(--faint); border-top: 1px solid var(--line); padding-top: 12px; }
+
+  .card-cta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .card:hover .card-cta { color: var(--accent); }
+  .card:hover .card-cta svg { transform: translateX(3px); }
+  .card-cta svg { transition: transform .16s ease; }
+
+  /* ---- dialog ---- */
+  dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); padding: 0; width: min(680px,92vw); max-height: 88vh; overflow: hidden; box-shadow: 0 30px 80px -20px rgba(0,0,0,.8); }
+  dialog::backdrop { background: rgba(6,9,13,.66); backdrop-filter: blur(3px); }
+  .modal-body { overflow-y: auto; max-height: 88vh; }
+  .modal-head { position: sticky; top: 0; background: linear-gradient(var(--surface), var(--surface) 70%, rgba(22,29,39,0)); padding: 22px 26px 16px; }
+  .modal-head .league { font-size: 11px; margin-bottom: 10px; }
+  .modal-head h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+  .modal-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .verdict { display: flex; align-items: center; gap: 14px; margin: 4px 26px 0; padding: 16px; background: var(--accent-dim); border: 1px solid var(--accent-line); border-radius: 12px; }
+  .verdict.won { background: var(--won-dim); border-color: rgba(70,201,139,.4); } .verdict.lost { background: var(--lost-dim); border-color: rgba(242,109,109,.4); }
+  .verdict .big { font-size: 32px; font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; width: 40px; text-align: center; flex: none; }
+  .verdict.won .big { color: var(--won); } .verdict.lost .big { color: var(--lost); }
+  .verdict .vtext { display: flex; flex-direction: column; gap: 2px; } .verdict .vtext b { font-size: 16px; } .verdict .vtext span { font-size: 12.5px; color: var(--muted); }
+  .verdict .vprob { margin-left: auto; text-align: right; } .verdict .vprob b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; } .verdict .vprob span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+  .betline { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 14px 26px 0; padding: 12px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+  .betline div span { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; display: block; }
+  .betline div b { font-variant-numeric: tabular-nums; }
+  .section-label { text-transform: uppercase; letter-spacing: .12em; font-size: 11px; font-weight: 700; color: var(--accent); margin: 22px 26px 8px; }
+  .analysis { margin: 0 26px; color: #d3dde6; font-size: 14.5px; line-height: 1.62; } .analysis p { margin: 0 0 12px; }
+  ul.evidence { margin: 0 26px 8px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  ul.evidence li { position: relative; padding: 10px 12px 10px 30px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; font-size: 13px; color: #c4d0da; line-height: 1.5; }
+  ul.evidence li::before { content: ""; position: absolute; left: 12px; top: 15px; width: 7px; height: 7px; border-radius: 2px; background: var(--accent); }
+  ul.evidence li b { color: var(--text); font-weight: 700; }
+  .disclaimer { font-size: 11.5px; color: var(--faint); margin: 20px 26px 24px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .close { position: absolute; top: 16px; right: 18px; width: 34px; height: 34px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); color: var(--muted); font-size: 18px; cursor: pointer; display: grid; place-items: center; }
+  .close:hover { color: var(--text); border-color: var(--accent-line); } .close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <nav class="topnav">
+    <a href="/" class="active">Cruscotto scommesse</a>
+    <a href="/oggi">Partite di oggi</a>
+    <a href="/pronostici">Pronostici</a>
+  </nav>
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Pronostici 1X2 · scommesse & profitto/perdita</p>
+      <h1>Cruscotto scommesse</h1>
+      <p>Ogni pronostico confidente viene "bloccato" come scommessa e verificato a fine partita: verde se vinta, rossa se persa. Sotto, la simulazione del bankroll per diversi budget su tutte le scommesse liquidate (Kelly frazionario con tetto al 5%, solo quote ≥ 1.10 e valore atteso positivo).</p>
+    </div>
+  </header>
+
+  <section class="pl">
+    <h2>Simulazione bankroll · tutte le scommesse liquidate</h2>
+    <div class="pl-grid" id="pl-grid"></div>
+  </section>
+
+  <main class="grid" id="grid" aria-label="Pronostici delle partite"></main>
+
+  <section class="pl" id="synthetic-wrap" hidden style="margin-top:40px">
+    <h2>Simulazione sintetica · partite senza quota reale</h2>
+    <p style="color:var(--muted);font-size:13px;max-width:70ch;margin:-4px 0 14px">
+      Quando non c'è una quota Betfair/Bet365, la scommessa è simulata a quota fissa
+      conservativa: se perde si perde tutta la posta, se vince guadagna poco (stake
+      fisso, non Kelly). Bankroll <b>separato</b> da quello reale — misura quanto il
+      modello azzecca i vincitori, non se batte il mercato.
+    </p>
+    <div class="pl-grid" id="synthetic-pl-grid"></div>
+    <main class="grid" id="synthetic-grid" style="margin-top:16px" aria-label="Scommesse sintetiche"></main>
+  </section>
+</div>
+
+<dialog id="modal" aria-labelledby="m-title">
+  <button class="close" id="close" aria-label="Chiudi analisi">&times;</button>
+  <div class="modal-body" id="modal-body"></div>
+</dialog>
+
+<script>
+  // Dati reali iniettati dall'exporter (main.py --export-dashboard) da match_bets.
+  const DASHBOARD = __DASHBOARD_JSON__;
+  const MATCHES = DASHBOARD.matches || [];
+  const PL = DASHBOARD.pl || {};
+  const SYNTHETIC = DASHBOARD.synthetic || { matches: [], pl: {} };
+
+  const OUTCOME = { "1": { label: "Vittoria casa", key: "home" }, "X": { label: "Pareggio", key: null }, "2": { label: "Vittoria trasferta", key: "away" } };
+  const STATUS = { won: "Vinta", lost: "Persa", pending: "In attesa" };
+  const money = (n) => "€" + n.toFixed(2);
+
+  // ---- P/L tiles ----
+  function renderPl(plObj, gridEl, emptyMsg) {
+    if (Object.keys(plObj).length === 0) {
+      gridEl.innerHTML = `<div class="tile" style="grid-column:1/-1"><div class="budget">${emptyMsg}</div><div class="roi" style="color:var(--muted);font-weight:600">Comparirà quando le partite bloccate finiranno.</div></div>`;
+      return;
+    }
+    Object.keys(plObj).sort((a, b) => a - b).forEach((budget) => {
+      const [end, roi] = plObj[budget];
+      const el = document.createElement("div");
+      el.className = "tile " + (roi >= 0 ? "up" : "down");
+      el.innerHTML = `
+        <div class="budget">Budget ${money(+budget)}</div>
+        <div class="end">${money(end)}</div>
+        <div class="roi">${roi >= 0 ? "+" : ""}${roi.toFixed(1)}% ROI</div>
+        <div class="bar"><i style="width:${Math.min(100, Math.abs(roi) * 2)}%"></i></div>`;
+      gridEl.appendChild(el);
+    });
+  }
+
+  // ---- cards ----
+  const fmt = (iso) => {
+    const d = new Date(iso);
+    return { day: d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }),
+             time: d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) };
+  };
+
+  function renderCards(matches, gridEl, emptyMsg) {
+    const sorted = [...matches].sort((a, b) => new Date(a.kickoffUtc) - new Date(b.kickoffUtc));
+    if (sorted.length === 0) {
+      gridEl.innerHTML = `<div class="tile" style="grid-column:1/-1"><div class="budget">${emptyMsg}</div><div class="roi" style="color:var(--muted);font-weight:600">Le card compaiono quando una predizione raggiunge la soglia di lock.</div></div>`;
+      return;
+    }
+    sorted.forEach((m) => {
+      const { day, time } = fmt(m.kickoffUtc);
+      const settled = m.status === "won" || m.status === "lost";
+      const scoreCell = (side) => settled ? `<span class="sc">${side === "home" ? m.finalHome : m.finalAway}</span>` : "";
+      const lockMin = m.lockedMinute != null ? `<span class="lockmin">🔒 ${m.lockedMinute}'</span>` : "";
+      const stakeKind = m.synthetic ? "stake fisso · sintetica" : "Kelly frazionario";
+      const stakeLine = m.stakePct != null
+        ? `<div class="stake-line">Puntata <b>${m.stakePct}%</b> del bankroll <span>· ${stakeKind}</span></div>`
+        : "";
+      const book = m.bookmaker ? `<span class="book">${m.bookmaker}</span>` : "";
+      const betBlock = m.odds != null
+        ? `<div class="bet-row"><span class="lbl">Scommessa</span><span class="chip">${m.predicted}</span>
+             <span class="odds">@ ${m.odds.toFixed(2)}</span>${book}${lockMin}<span class="prob">${m.probability}%</span></div>${stakeLine}`
+        : `<div class="nobet">${lockMin ? `Decisa al ${m.lockedMinute}'. ` : ""}${m.noBetReason || "Nessuna scommessa"}</div>`;
+
+      const card = document.createElement("button");
+      card.className = "card " + m.status;
+      card.setAttribute("aria-label", `${m.home} contro ${m.away}, ${STATUS[m.status]}`);
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="league">${m.leagueSlug}</span>
+          <span class="status ${m.status}">${STATUS[m.status]}</span>
+        </div>
+        <div class="teams">
+          <div class="team ${m.predicted === "1" ? "pick" : ""}"><span class="pos">Casa</span><span class="name">${m.home}</span>${scoreCell("home")}</div>
+          <div class="team ${m.predicted === "2" ? "pick" : ""}"><span class="pos">Trasf.</span><span class="name">${m.away}</span>${scoreCell("away")}</div>
+        </div>
+        ${betBlock}
+        <div class="card-top" style="border-top:1px solid var(--line);padding-top:11px">
+          <span class="kickoff"><span class="day">${day}</span>${time}</span>
+          <span class="card-cta">Analisi <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>`;
+      card.addEventListener("click", () => openModal(m));
+      gridEl.appendChild(card);
+    });
+  }
+
+  renderPl(PL, document.getElementById("pl-grid"), "Nessuna scommessa reale ancora liquidata");
+  renderCards(MATCHES, document.getElementById("grid"), "Nessuna scommessa bloccata");
+
+  if ((SYNTHETIC.matches || []).length > 0) {
+    document.getElementById("synthetic-wrap").hidden = false;
+    renderPl(SYNTHETIC.pl || {}, document.getElementById("synthetic-pl-grid"), "Nessuna scommessa sintetica liquidata");
+    renderCards(SYNTHETIC.matches, document.getElementById("synthetic-grid"), "Nessuna scommessa sintetica");
+  }
+
+  // ---- modal ----
+  const modal = document.getElementById("modal");
+  const modalBody = document.getElementById("modal-body");
+  function openModal(m) {
+    const o = OUTCOME[m.predicted];
+    const winner = o.key ? m[o.key] : "Pareggio";
+    const { day, time } = fmt(m.kickoffUtc);
+    const settled = m.status === "won" || m.status === "lost";
+    const betLine = m.odds != null ? `
+      <div class="betline">
+        <div><span>Esito</span><b>${m.predicted} · ${winner}</b></div>
+        <div><span>Quota${m.bookmaker ? ` · ${m.bookmaker}` : ""}</span><b>${m.odds.toFixed(2)}</b></div>
+        <div><span>Confidenza</span><b>${m.probability}%</b></div>
+        ${m.stakePct != null ? `<div><span>Puntata (${m.synthetic ? "stake fisso · sintetica" : "Kelly frazionario"})</span><b>${m.stakePct}% del bankroll</b></div>` : ""}
+        ${m.lockedMinute != null ? `<div><span>Bloccata al minuto</span><b>${m.lockedMinute}'</b></div>` : ""}
+        ${settled ? `<div><span>Risultato reale</span><b>${m.finalHome}–${m.finalAway}</b></div>` : ""}
+        <div><span>Scommessa</span><b>${STATUS[m.status]}</b></div>
+      </div>` : `<div class="betline"><div><span>Scommessa</span><b>Nessuna</b></div>${m.lockedMinute != null ? `<div><span>Decisa al minuto</span><b>${m.lockedMinute}'</b></div>` : ""}<div style="flex:1"><span>Motivo</span><b>${m.noBetReason || "-"}</b></div></div>`;
+    modalBody.innerHTML = `
+      <div class="modal-head">
+        <div class="league">${m.league} · ${m.leagueSlug}</div>
+        <h2 id="m-title">${m.home} <span style="color:var(--faint);font-weight:600">vs</span> ${m.away}</h2>
+        <div class="modal-meta"><span>🗓 ${day}, ${time}</span></div>
+      </div>
+      <div class="verdict ${m.status}">
+        <div class="big">${m.predicted}</div>
+        <div class="vtext"><b>${winner}</b><span>${o.label}</span></div>
+        <div class="vprob"><b>${m.probability}%</b><span>Confidenza</span></div>
+      </div>
+      ${betLine}
+      <div class="section-label">Analisi</div>
+      <div class="analysis">${m.rationale.map((p) => `<p>${p}</p>`).join("")}</div>
+      <div class="section-label">Evidenze</div>
+      <ul class="evidence">${m.evidence.map((e) => `<li>${e}</li>`).join("")}</ul>
+      <p class="disclaimer">Pronostico e scommessa generati automaticamente a fini analitici. Non è un consiglio di scommessa. Dati d'esempio; il P/L usa il motore Kelly reale.</p>`;
+    if (typeof modal.showModal === "function") modal.showModal();
+  }
+  document.getElementById("close").addEventListener("click", () => modal.close());
+  modal.addEventListener("click", (e) => {
+    const r = modal.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) modal.close();
+  });
+</script>

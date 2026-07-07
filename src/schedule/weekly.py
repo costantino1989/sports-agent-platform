@@ -1,7 +1,6 @@
 """Unified weekly match logic for schedule module."""
 
 from __future__ import annotations
-import json
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone, tzinfo
@@ -164,6 +163,27 @@ def _resolve_italy_timezone() -> tzinfo | None:
         return None
 
 ITALY_TIMEZONE = _resolve_italy_timezone()
+
+
+def local_week_dates(now_utc: datetime, local_tz: tzinfo | None) -> list[date]:
+    """Return the 7 dates (Monday..Sunday) of the week containing ``now_utc``.
+
+    The week is anchored to the local calendar day, not UTC: the cron runs at
+    00:00 Europe/Rome (22:00 UTC the day before), so anchoring to UTC would sync
+    the week that just ended. When no timezone is available, falls back to UTC.
+
+    Args:
+        now_utc: The current instant (timezone-aware, typically UTC).
+        local_tz: The local timezone to anchor the week to, or ``None`` for UTC.
+
+    Returns:
+        Seven consecutive ``date`` objects from the Monday to the Sunday of the
+        local week containing ``now_utc``.
+    """
+    reference = now_utc.astimezone(local_tz) if local_tz is not None else now_utc
+    today = reference.date()
+    week_start = today - timedelta(days=today.weekday())
+    return [week_start + timedelta(days=offset) for offset in range(7)]
 
 class WeeklyDataGrouper:
     def group_matches(self, matches: list[tuple[str, str, WeeklyMatchModel]]) -> WeeklyDataTree:
@@ -352,9 +372,7 @@ class WeeklyMatchesAction:
 
     @staticmethod
     def _current_week_dates_utc() -> list[date]:
-        today = datetime.now(timezone.utc).date()
-        week_start = today - timedelta(days=today.weekday())
-        return [week_start + timedelta(days=offset) for offset in range(7)]
+        return local_week_dates(datetime.now(timezone.utc), ITALY_TIMEZONE)
 
     def _extract_matches(
         self,

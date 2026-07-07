@@ -1,4 +1,4 @@
-"""Safe terminal execution skill for LangGraph tools."""
+"""Safe terminal execution skill for the prediction agent tools."""
 
 from __future__ import annotations
 

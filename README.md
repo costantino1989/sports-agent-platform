@@ -5,7 +5,7 @@ Tool CLI Python per raccogliere partite calcio da ESPN e generare output per ana
 ## Requisiti
 
 - Python `>= 3.12`
-- Dipendenze dal `pyproject.toml` (LangChain/LangGraph/Ollama incluse)
+- Dipendenze dal `pyproject.toml` (Agno + client OpenAI incluse)
 
 ## Installazione
 
@@ -51,7 +51,7 @@ Output di default: `output\match_markdowns`.
 python main.py --build-markdowns --markdown-dir output\my_markdowns
 ```
 
-### 5. Flusso end-to-end predizione 1X2 (LangGraph + Ollama)
+### 5. Flusso end-to-end predizione 1X2 (Agno + endpoint OpenAI-compatibile)
 
 ```powershell
 python main.py --predict-1x2
@@ -66,6 +66,34 @@ python main.py --schedule-sync
 ```
 
 Default DB path: `output\schedule_state.db`.
+
+### 7. Tracciamento live (`--track-live`)
+
+```powershell
+python main.py --track-live
+```
+
+Esegue **un ciclo** di tracciamento: per ogni partita già iniziata fa un probe
+economico (risultato/minuto/rossi) e **ricalcola la predizione solo se serve** —
+dopo la prima predizione **ripredice solo** su gol contro il pronostico, nuovo
+cartellino rosso, o ogni `PREDICTION_FORCE_REFRESH_EVERY` cicli (non a ogni ciclo:
+evita di rieseguire l'LLM su dati invariati). Pensato per essere lanciato
+periodicamente via cron, es. ogni 5 minuti:
+
+```bash
+# ogni 6 ore: aggiorna le partite della settimana (upcoming) + i job 30'/60'
+0 */6 * * * cd /path/al/progetto && uv run python main.py --schedule-sync >> output/sync.log 2>&1
+# ogni 5 minuti: tracciamento live (probe + predici/salta/blocca/liquida)
+*/5 * * * * cd /path/al/progetto && uv run python main.py --track-live >> output/track_live.log 2>&1
+```
+
+Al lock la scommessa si "chiude": se la confidenza raggiunge `PREDICTION_LOCK_CONFIDENCE`
+**oppure** la quota dell'esito previsto scende a `PREDICTION_LOCK_ODDS` (~1.2), si smette
+di predire e si decide se/quanto scommettere (`PREDICTION_MIN_ODDS`, Kelly frazionario). Il
+tracciamento **predice** solo sulle partite iniziate nelle ultime `PREDICTION_ACTIVE_WINDOW_HOURS`
+ore; la **liquidazione** invece non è vincolata alla finestra: ogni scommessa bloccata e non ancora
+liquidata viene comunque risolta col punteggio finale, anche se lo stato ESPN resta indietro
+(status lag) o la partita è uscita dalla finestra prima di essere vista come conclusa.
 
 
 ## Regole di selezione per `--build-markdowns`
@@ -183,12 +211,23 @@ Logger colorato in console:
 
 Ogni riga include timestamp, classe/modulo e numero riga.
 
-## Configurazione Ollama (predizione 1X2)
+## Configurazione modello (predizione 1X2)
 
-Variabili `.env` utilizzate:
+La predizione usa Agno su un endpoint OpenAI-compatibile. Variabili `.env` utilizzate:
 
-- `OLLAMA_MODEL` (default: `gemma4:latest`)
-- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
+- `ZEN_API_KEY` (obbligatoria: API key dell'endpoint)
+- `ZEN_MODEL_ID` (default: `glm-5.2`; sul gateway zen è l'unico modello che supporta sia la structured-output sia il tool-calling, entrambi richiesti dalla pipeline)
+- `ZEN_BASE_URL` (default: `https://opencode.ai/zen/go/v1` — senza `/chat/completions`)
+- `MODEL_TIMEOUT_SECONDS` (default: `180`; un dossier live completo ~28KB richiede ~110s per la predizione strutturata)
+- `PREDICTION_CONCURRENCY` (default: `4`)
+- `PREDICTION_FORCE_REFRESH_EVERY` (default: `3`), `PREDICTION_RECENT_EVENTS` (default: `15`) — tracciamento live
+- `ODDS_API_KEY` (opzionale): chiave di [The Odds API](https://the-odds-api.com/). Se
+  impostata, il dossier e la predizione usano **quote reali di mercato** (di default il
+  **Betfair Exchange**) al posto dello snapshot ESPN; senza chiave si usa il fallback ESPN.
+- `ODDS_API_REGION` (default: `eu`), `ODDS_API_BOOKMAKER` (default: `betfair_ex_eu`),
+  `ODDS_API_CACHE_MINUTES` (default: `3`, cache per lega per risparmiare crediti).
+  Le quote reali sono disponibili solo per le leghe coperte dal provider (Serie A, top
+  campionati, coppe UEFA, Mondiale, ecc.); per le leghe non coperte si ricade su ESPN.
 - `TERMINAL_TIMEOUT_SECONDS` (default: `45`)
 - `SCHEDULE_DB_PATH` (default: `output\schedule_state.db`)
 - `SCHEDULE_STALE_MINUTES` (default: `30`)

@@ -13,13 +13,9 @@ from src.dossier.render_tools import (
     sanitize_payload,
 )
 from src.models.dossier import MatchDossierData
+from src.models.no_data import NO_DATA_TEMPLATE
 
 JsonDict: TypeAlias = dict[str, Any]
-
-NO_DATA_TEMPLATE = (
-    "No data found (source: ESPN API, section: {section}). "
-    "Suggested action: verify via web search."
-)
 
 
 class MatchContextRenderer:

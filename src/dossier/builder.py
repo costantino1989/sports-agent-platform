@@ -13,6 +13,8 @@ from src.dossier.builder_fetch import DossierFetchFacade
 from src.dossier.client import DossierDataClient
 from src.dossier.extractor import DossierDataExtractor
 from src.dossier.fetch_cache import LeaguePayloadTaskCache
+from src.dossier.leaders_fallback import resolve_leaders_payload
+from src.dossier.naming import build_dossier_filename
 from src.models.dossier import EndpointPayload, JsonData, MatchDossierData, TeamDossierData
 from src.models.live_models import MatchRecordModel
 from src.utils.color_logger import get_logger
@@ -155,6 +157,9 @@ class MatchDossierBuilder:
         head_to_head = await asyncio.to_thread(self._extractor.build_head_to_head, teams)
         LOGGER.info(f"Match aggregation completed [{match_reference}] probabilities={self._payload_state(probabilities)}, odds={self._payload_state(odds)}, leaders={self._payload_state(leaders)}, teams={len(teams)}, head_to_head={len(head_to_head)} in {self._elapsed_seconds(aggregation_phase_start):.3f}s.")
 
+        # The core leaders endpoint 404s for some leagues; fall back to the
+        # leaders block already present in the event summary when it is empty.
+        leaders = resolve_leaders_payload(leaders=leaders, summary=summary)
         return MatchDossierData(
             match=match,
             output_path=output_path,
@@ -211,9 +216,7 @@ class MatchDossierBuilder:
     def _build_file_name(match: MatchRecordModel) -> str:
         """Build stable markdown filename from league/event identifiers."""
 
-        league = match.league.slug.replace(".", "_")
-        event_id = (match.event.id or "unknown").replace("/", "_")
-        return f"{league}_{event_id}.md"
+        return build_dossier_filename(match)
 
     @staticmethod
     def _build_match_reference(match: MatchRecordModel) -> str:

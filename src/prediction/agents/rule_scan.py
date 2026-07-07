@@ -5,9 +5,9 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
+from src.models.no_data import NO_DATA_SECTION_PATTERN
 from src.prediction.models import RuleSignal
 
-NO_DATA_PATTERN = re.compile(r"No data found \(source: ESPN API, section: (?P<section>.+?)\)\.")
 ODDS_ROW_PATTERN = re.compile(
     r"^\|\s*(?P<provider>[^|]+)\|\s*(?P<snapshot>[^|]+)\|\s*(?P<home>[^|]+)\|\s*(?P<draw>[^|]+)\|\s*(?P<away>[^|]+)\|$"
 )
@@ -41,7 +41,7 @@ class DossierRuleScanner:
         """Create one signal for each explicit no-data section."""
 
         signals: list[RuleSignal] = []
-        for match in NO_DATA_PATTERN.finditer(markdown_text):
+        for match in NO_DATA_SECTION_PATTERN.finditer(markdown_text):
             section_name = match.group("section").strip()
             query = self._query_for_section(section_name=section_name)
             signals.append(

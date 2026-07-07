@@ -70,29 +70,6 @@ class ScheduledRunRecord(ScheduleBaseModel):
     error: str | None = Field(default=None, description="Last error text.")
 
 
-class MatchSnapshotRecord(ScheduleBaseModel):
-    """Append-only snapshot row for historical analysis.
-
-    Attributes:
-        event_id: ESPN event identifier.
-        captured_at: Snapshot capture timestamp in UTC.
-        status_state: Match state at capture time.
-        minute: Detected minute from status detail.
-        home_score: Home score string.
-        away_score: Away score string.
-        source: Snapshot source marker.
-        payload_json: Optional serialized payload.
-    """
-
-    event_id: str = Field(description="ESPN event identifier.")
-    captured_at: datetime = Field(description="Snapshot capture timestamp in UTC.")
-    minute: int | None = Field(default=None, ge=0, description="Detected match minute.")
-    home_score: str | None = Field(default=None, description="Home score value.")
-    away_score: str | None = Field(default=None, description="Away score value.")
-    source: str = Field(description="Snapshot source marker.")
-    payload_json: str = Field(description="Optional serialized payload.")
-
-
 class ScheduleTickResult(ScheduleBaseModel):
     """Result object returned by one scheduler tick execution.
 
